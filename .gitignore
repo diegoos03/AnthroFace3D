@@ -1,9 +1,9 @@
-# Entornos virtuales (por si acaso creas uno localmente)
+# Entornos virtuales 
 venv/
 env/
 .env
 
-# Archivos pesados de modelos y pesos (¡Crucial para no bloquear GitHub!)
+# Archivos pesados de modelos y pesos 
 models/weights/
 assets/
 *.pth
@@ -11,12 +11,16 @@ assets/
 *.dat
 *.mat
 
-# Bases de datos y resultados (protege privacidad y ahorra espacio)
+# Bases de datos y resultados 
 data/
 output/
+results/
 
 # Caché de Python y Jupyter Notebooks
 __pycache__/
 *.py[cod]
 *$py.class
 .ipynb_checkpoints/
+.mplconfig/
+external/util/cython_renderer/build/
+external/util/cython_renderer/*.so
