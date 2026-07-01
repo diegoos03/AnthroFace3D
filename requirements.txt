@@ -12,6 +12,7 @@ transformers==5.3.0
 opencv-python==4.13.0.92
 dlib==20.0.0
 mtcnn==1.0.0
+tensorflow==2.21.0  # requerido por mtcnn (import incondicional), aunque el proyecto no usa TF directamente
 scikit-image==0.26.0
 albumentations==2.0.8
 
