@@ -12,7 +12,7 @@ from core.segmentation import run_segmentation
 from core.inference import run_3ddfa, project_to_original_image
 from core.visualization import launch_results_viewer
 from core.mapping import map_segmentation_to_mesh
-from core.symmetry import apply_symmetry
+from core.symmetry import apply_symmetry, apply_nose_lip_symmetry
 from core.constants import label2id, symmetric_translate
 from core.postprocess import clean_labels_with_connectivity
 from core.measurements import nasal_index
@@ -33,7 +33,7 @@ def main():
     print("[+] All models successfully loaded into memory.")
 
     # Image
-    image = load_and_crop_image("examples/foto_3.jpg", config)
+    image = load_and_crop_image("examples/foto_5.jpg", config)
 
     # Segmentation
     labels = run_segmentation(image, seg_processor, seg_model, device)
@@ -47,17 +47,30 @@ def main():
     # Map segmentation to mesh vertices
     v_labels = map_segmentation_to_mesh(labels, points)
 
+    # Canonical (unposed) 3D shape: the correct space for mirror-based
+    # symmetry and neighbor-based cleanup, independent of head rotation
+    canonical_shape = results['face_shape'][0]
+
     # Apply symmetry correction
     v_labels_sym = apply_symmetry(
-        points=points,
+        points=canonical_shape,
         labels=v_labels,
         results=results,
         symmetric_translate=symmetric_translate
     )
 
+    # Enforce nose/lip symmetry against head-turn direction
+    v_labels_sym = apply_nose_lip_symmetry(
+        points=canonical_shape,
+        labels=v_labels_sym,
+        angle=results['angle'],
+        label2id=label2id,
+        symmetric_translate=symmetric_translate
+    )
+
     # Clean small noisy regions
     v_labels_clean = clean_labels_with_connectivity(
-        points=points,
+        points=canonical_shape,
         labels=v_labels_sym,
         label2id=label2id
     )

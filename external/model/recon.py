@@ -489,6 +489,8 @@ class face_model:
         result_dict = {
             'v3d': v3d.detach().cpu().numpy(),
             'v2d': v2d.detach().cpu().numpy(),
+            'face_shape': face_shape.detach().cpu().numpy(),
+            'angle': alpha_dict['angle'].detach().cpu().numpy(),
             'face_texture': np.clip(face_texture.detach().cpu().numpy(), 0, 1),
             'tri': self.tri.detach().cpu().numpy(),
             'uv_coords': self.uv_coords.detach().cpu().numpy(),
@@ -502,7 +504,7 @@ class face_model:
             visible_idx = torch.zeros(35709).type(torch.int64).to(v3d.device)
             visible_idx[visible_idx_renderer.type(torch.int64)] = 1
             visible_idx[(face_norm_roted[..., 2] < 0)[0]] = 0
-            # result_dict['visible_idx'] = visible_idx
+            result_dict['visible_idx'] = visible_idx.detach().cpu().numpy()
 
         # landmarks 68 3d
         if self.args.ldm68:
