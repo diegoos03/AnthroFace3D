@@ -1,0 +1,29 @@
+# AnthroFace3D — dependencias directas
+# Generado a partir del entorno venv/ existente (Python 3.13.5)
+# Instalar con: pip install -r requirements.txt
+
+# Deep learning / reconstrucción 3D (3DDFA-V3) y segmentación (SegFormer)
+torch==2.11.0
+torchvision==0.26.0
+torchsummary==1.5.1
+transformers==5.3.0
+
+# Visión por computador
+opencv-python==4.13.0.92
+dlib==20.0.0
+mtcnn==1.0.0
+scikit-image==0.26.0
+albumentations==2.0.8
+
+# Numérico / científico
+numpy==2.4.3
+scipy==1.17.1
+pillow==12.1.1
+
+# Visualización
+matplotlib==3.10.8
+plotly==6.6.0
+
+# --- Opcional / solo necesario si se recompila la extensión Cython ---
+# (external/util/cython_renderer/*.so ya viene compilado en el repo)
+# Cython==3.2.4
