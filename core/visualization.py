@@ -8,6 +8,8 @@ import webbrowser
 import numpy as np
 
 from core.segmentation import visualize_segmentation
+from core.palette import INK, PART_COLORS, CONTEXT_COLOR, GENERIC_ACCENT
+from core.part_viewer import open_part_in_browser
 
 
 # Keep matplotlib cache inside the project to avoid permission warnings.
@@ -32,9 +34,12 @@ def _plot_sampled_points(ax, image, points, max_points=2000):
     if points is not None and len(points) > 0:
         stride = max(1, len(points) // max_points)
         sampled = points[::stride]
-        ax.scatter(sampled[:, 0], sampled[:, 1], s=1, c="lime", alpha=0.55)
-    ax.set_title("3D Back Projection")
+        ax.scatter(sampled[:, 0], sampled[:, 1], s=1, c=GENERIC_ACCENT, alpha=0.55)
     ax.axis("off")
+
+
+def _style_panel_title(ax, text):
+    ax.set_title(text, fontsize=12, color=INK["secondary"], fontweight="medium", pad=8)
 
 
 def create_results_figure(image, labels, results, points):
@@ -42,39 +47,40 @@ def create_results_figure(image, labels, results, points):
     render_shape = _to_uint8_image(results["render_shape"][0])
     seg_overlay = visualize_segmentation(image, labels)
 
-    fig = Figure(figsize=(16, 10), dpi=100)
+    fig = Figure(figsize=(16, 10), dpi=100, facecolor=INK["surface"])
     axes = fig.subplots(2, 3).ravel()
 
     axes[0].imshow(image)
-    axes[0].set_title("Cropped Input")
+    _style_panel_title(axes[0], "Cropped Input")
     axes[0].axis("off")
 
     axes[1].imshow(seg_overlay)
-    axes[1].set_title("Segmentation Overlay")
+    _style_panel_title(axes[1], "Segmentation Overlay")
     axes[1].axis("off")
 
     axes[2].imshow(render_face)
-    axes[2].set_title("Rendered Face")
+    _style_panel_title(axes[2], "Rendered Face")
     axes[2].axis("off")
 
     axes[3].imshow(render_shape)
-    axes[3].set_title("Rendered Geometry")
+    _style_panel_title(axes[3], "Rendered Geometry")
     axes[3].axis("off")
 
     _plot_sampled_points(axes[4], image, points)
+    _style_panel_title(axes[4], "3D Back Projection")
 
     if "ldm68" in results:
         axes[5].imshow(image)
         landmarks = results["ldm68"][0]
-        axes[5].scatter(landmarks[:, 0], 223 - landmarks[:, 1], s=10, c="cyan")
-        axes[5].set_title("68 Landmarks")
+        axes[5].scatter(landmarks[:, 0], 223 - landmarks[:, 1], s=10, c=GENERIC_ACCENT)
+        _style_panel_title(axes[5], "68 Landmarks")
         axes[5].axis("off")
     else:
         axes[5].imshow(image)
-        axes[5].set_title("Input Preview")
+        _style_panel_title(axes[5], "Input Preview")
         axes[5].axis("off")
 
-    fig.suptitle("AnthroFace3D Results", fontsize=16)
+    fig.suptitle("AnthroFace3D Results", fontsize=18, color=INK["primary"], fontweight="bold")
     fig.tight_layout()
     return fig
 
@@ -94,56 +100,22 @@ def create_browser_mesh_figure(results, vertex_labels=None, label_names=None, sh
         sampled_labels = np.asarray(vertex_labels)[::show_every].astype(np.int32)
 
     if label_names is None:
-        hover_names = [f"Class {int(label)}" for label in sampled_labels]
+        hover_names = np.array([f"Class {int(label)}" for label in sampled_labels])
     else:
-        hover_names = [label_names.get(int(label), f"Class {int(label)}") for label in sampled_labels]
+        hover_names = np.array([label_names.get(int(label), f"Class {int(label)}") for label in sampled_labels])
+    sampled_label_names = hover_names
 
-    semantic_colors = {
-        "background": "#8ecae6",
-        "skin": "#a98274",
-        "nose": "#3f6db5",
-        "eye_g": "#8a8f3e",
-        "l_eye": "#4ca549",
-        "r_eye": "#bfc75f",
-        "l_brow": "#d767d7",
-        "r_brow": "#00b4d8",
-        "l_ear": "#2316df",
-        "r_ear": "#ec541c",
-        "mouth": "#54c49b",
-        "u_lip": "#eb43aa",
-        "l_lip": "#d9bf50",
-        "hair": "#1d3557",
-        "hat": "#4f5d75",
-        "ear_r": "#dddddd",
-        "neck_l": "#7f5539",
-        "neck": "#7f5539",
-        "cloth": "#6c757d",
-    }
-    fallback_palette = [
-        "#3f6db5",
-        "#d767d7",
-        "#bfc75f",
-        "#54c49b",
-        "#d9bf50",
-        "#8ecae6",
-        "#7f5539",
-        "#6c757d",
-    ]
-    unique_labels = np.unique(sampled_labels)
     fig = go.Figure()
 
-    for idx, label in enumerate(unique_labels):
-        mask = sampled_labels == label
-        label_name = label_names.get(int(label), f"Class {int(label)}") if label_names else f"Class {int(label)}"
-        marker_color = semantic_colors.get(label_name, fallback_palette[idx % len(fallback_palette)])
+    def _add_trace(mask, name, color, marker_size):
         fig.add_trace(
             go.Scatter3d(
                 x=sampled_shape[mask, 0],
                 y=sampled_shape[mask, 1],
                 z=sampled_shape[mask, 2],
                 mode="markers",
-                name=label_name,
-                text=np.asarray(hover_names)[mask],
+                name=name,
+                text=hover_names[mask],
                 customdata=np.column_stack(
                     [
                         sampled_shape[mask, 0],
@@ -159,32 +131,40 @@ def create_browser_mesh_figure(results, vertex_labels=None, label_names=None, sh
                     "<extra></extra>"
                 ),
                 marker=dict(
-                    size=1.4,
-                    color=marker_color,
+                    size=marker_size,
+                    color=color,
                     opacity=1.0,
                     line=dict(width=0.0),
                 ),
-                hoverlabel=dict(
-                    bgcolor=marker_color,
-                    bordercolor=marker_color,
-                    font=dict(color="white", size=13),
-                ),
-                showlegend=False,
+                hoverlabel=dict(bgcolor=color, bordercolor=color, font=dict(color="white", size=13)),
             )
         )
 
+    # Anatomically relevant parts each get their own fixed categorical color.
+    for part_name, color in PART_COLORS.items():
+        mask = sampled_label_names == part_name
+        if mask.any():
+            _add_trace(mask, part_name, color, marker_size=1.4)
+
+    # Everything else (background, hair, hat, clothing...) recedes as context,
+    # grouped into a single trace instead of competing for a categorical slot.
+    context_mask = ~np.isin(sampled_label_names, list(PART_COLORS.keys()))
+    if context_mask.any():
+        _add_trace(context_mask, "Other", CONTEXT_COLOR, marker_size=1.0)
+
     fig.update_layout(
-        title="Interactive 3D Face Reconstruction",
+        title=dict(text="Interactive 3D Face Reconstruction", font=dict(color=INK["primary"], size=20)),
         scene_aspectmode="data",
-        margin=dict(l=0, r=0, t=40, b=0),
-        paper_bgcolor="white",
-        plot_bgcolor="white",
+        margin=dict(l=0, r=0, t=56, b=0),
+        paper_bgcolor=INK["surface"],
+        plot_bgcolor=INK["surface"],
         scene=dict(
-            xaxis=dict(backgroundcolor="rgb(245,245,245)", gridcolor="rgb(210,210,210)"),
-            yaxis=dict(backgroundcolor="rgb(245,245,245)", gridcolor="rgb(210,210,210)"),
-            zaxis=dict(backgroundcolor="rgb(245,245,245)", gridcolor="rgb(210,210,210)"),
+            xaxis=dict(backgroundcolor=INK["surface"], gridcolor=INK["gridline"]),
+            yaxis=dict(backgroundcolor=INK["surface"], gridcolor=INK["gridline"]),
+            zaxis=dict(backgroundcolor=INK["surface"], gridcolor=INK["gridline"]),
         ),
-        showlegend=False,
+        legend=dict(font=dict(color=INK["secondary"])),
+        showlegend=True,
     )
     return fig
 
@@ -231,6 +211,58 @@ def _embed_figure(parent, figure, with_toolbar=False):
     return canvas
 
 
+def _configure_style(root):
+    style = ttk.Style(root)
+    try:
+        style.theme_use("clam")
+    except tk.TclError:
+        pass
+
+    root.configure(background=INK["surface"])
+    style.configure("TFrame", background=INK["surface"])
+    style.configure("TLabel", background=INK["surface"], foreground=INK["primary"])
+    style.configure("Secondary.TLabel", background=INK["surface"], foreground=INK["secondary"])
+    style.configure("Muted.TLabel", background=INK["surface"], foreground=INK["muted"])
+    style.configure("TNotebook", background=INK["surface"], borderwidth=0)
+    style.configure("TNotebook.Tab", padding=(16, 8))
+    style.configure("TButton", padding=(12, 6))
+    return style
+
+
+def _build_part_row(parent, part, root):
+    row = ttk.Frame(parent, padding=(0, 12))
+    row.pack(fill="x", anchor="w")
+    row.columnconfigure(1, weight=1)
+
+    swatch = tk.Canvas(row, width=16, height=16, highlightthickness=0, background=INK["surface"])
+    swatch.create_oval(2, 2, 14, 14, fill=part.color, outline="")
+    swatch.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="n")
+
+    name_label = ttk.Label(row, text=part.display_name, font=("TkDefaultFont", 13, "bold"))
+    name_label.grid(row=0, column=1, sticky="w")
+
+    summary_text = "    ".join(f"{key}: {value}" for key, value in part.measurements.items())
+    summary = ttk.Label(row, text=summary_text, style="Secondary.TLabel", wraplength=760, justify="left")
+    summary.grid(row=1, column=1, sticky="w", pady=(2, 0))
+
+    status_var = tk.StringVar(value="")
+    status_label = ttk.Label(row, textvariable=status_var, style="Muted.TLabel", wraplength=760, justify="left")
+
+    def _open():
+        try:
+            opened_path = open_part_in_browser(part)
+            status_var.set(f"Opened in browser: {opened_path}")
+        except Exception as exc:
+            status_var.set(f"Could not open: {exc}")
+            messagebox.showerror(part.display_name, str(exc), parent=root)
+
+    button = ttk.Button(row, text=f"Open {part.display_name} in browser", command=_open)
+    button.grid(row=0, column=2, rowspan=2, padx=(20, 0), sticky="e")
+    status_label.grid(row=2, column=1, columnspan=2, sticky="w", pady=(4, 0))
+
+    return row
+
+
 def launch_results_viewer(
     image,
     labels,
@@ -238,22 +270,28 @@ def launch_results_viewer(
     points,
     vertex_labels=None,
     label_names=None,
+    parts=None,
     save_path="results/pipeline_panels.png",
 ):
+    parts = parts or []
+
     results_figure = create_results_figure(image, labels, results, points)
     output_path = _save_figure(results_figure, save_path)
 
     root = tk.Tk()
     root.title("AnthroFace3D Viewer")
     root.geometry("1440x960")
+    _configure_style(root)
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill="both", expand=True)
 
     overview_tab = ttk.Frame(notebook)
     mesh_tab = ttk.Frame(notebook)
+    parts_tab = ttk.Frame(notebook)
     notebook.add(overview_tab, text="2D Results")
     notebook.add(mesh_tab, text="3D Viewer")
+    notebook.add(parts_tab, text="Measured Parts")
 
     _embed_figure(overview_tab, results_figure, with_toolbar=True)
 
@@ -266,16 +304,17 @@ def launch_results_viewer(
     description = ttk.Label(
         mesh_content,
         text=(
-            "Open the 3D reconstruction in your browser for smooth interaction, "
+            "Open the full 3D reconstruction in your browser for smooth interaction, "
             "hover labels, zoom, pan, and rotation."
         ),
+        style="Secondary.TLabel",
         wraplength=700,
         justify="left",
     )
     description.pack(anchor="w", pady=(0, 18))
 
     status_var = tk.StringVar(value="The browser viewer has not been opened yet.")
-    status = ttk.Label(mesh_content, textvariable=status_var, wraplength=900, justify="left")
+    status = ttk.Label(mesh_content, textvariable=status_var, style="Muted.TLabel", wraplength=900, justify="left")
     status.pack(anchor="w", pady=(12, 0))
 
     def _open_browser():
@@ -291,16 +330,42 @@ def launch_results_viewer(
             status_var.set(f"Could not open browser viewer: {exc}")
             messagebox.showerror("3D Viewer", str(exc), parent=root)
 
-    open_button = ttk.Button(mesh_content, text="Open 3D Viewer in Browser", command=_open_browser)
+    open_button = ttk.Button(mesh_content, text="Open Full Face in Browser", command=_open_browser)
     open_button.pack(anchor="w")
 
     info = ttk.Label(
         mesh_content,
         text="Tip: keep the browser open while you inspect the mesh. You can reopen it anytime from this button.",
+        style="Muted.TLabel",
         wraplength=900,
         justify="left",
     )
     info.pack(anchor="w", pady=(18, 0))
+
+    parts_content = ttk.Frame(parts_tab, padding=24)
+    parts_content.pack(fill="both", expand=True)
+
+    parts_title = ttk.Label(parts_content, text="Measured Parts", font=("TkDefaultFont", 14, "bold"))
+    parts_title.pack(anchor="w", pady=(0, 4))
+
+    if parts:
+        parts_description = ttk.Label(
+            parts_content,
+            text="Each measured part opens in its own isolated 3D view: its points, convex hull, and reference landmarks.",
+            style="Secondary.TLabel",
+            wraplength=900,
+            justify="left",
+        )
+        parts_description.pack(anchor="w", pady=(0, 12))
+        for part in parts:
+            _build_part_row(parts_content, part, root)
+    else:
+        empty_label = ttk.Label(
+            parts_content,
+            text="No measured parts were passed to the viewer.",
+            style="Muted.TLabel",
+        )
+        empty_label.pack(anchor="w", pady=(12, 0))
 
     root.mainloop()
     return output_path

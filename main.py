@@ -16,6 +16,7 @@ from core.symmetry import apply_symmetry, apply_nose_lip_symmetry
 from core.constants import label2id, symmetric_translate
 from core.postprocess import clean_labels_with_connectivity
 from core.measurements import nasal_index, nose_dimensions
+from core.parts import nose_part
 
 
 def main():
@@ -83,6 +84,19 @@ def main():
     print(f"[+] Nose width: {nose_shape['nose_width']:.2f}, length: {nose_shape['nose_length']:.2f}, "
           f"area: {nose_shape['nose_area']:.2f}, volume: {nose_shape['nose_volume']:.2f}")
 
+    # Measured parts, for the viewer's per-part isolated 3D views
+    ldm68_canonical = canonical_shape[recon_model.ldm68.cpu().numpy()]
+    parts = [
+        nose_part(
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            nasal_measurements=nasal_measurements,
+            nose_shape=nose_shape,
+            ldm68_canonical=ldm68_canonical,
+        ),
+    ]
+
     # Label names
     label_names = getattr(seg_model.config, "id2label", None)
     if label_names is not None:
@@ -94,8 +108,9 @@ def main():
         labels=labels,
         results=results,
         points=points,
-        vertex_labels=v_labels_clean,   
+        vertex_labels=v_labels_clean,
         label_names=label_names,
+        parts=parts,
     )
 
     print(f"[+] Results panel saved to: {panel_path}")
