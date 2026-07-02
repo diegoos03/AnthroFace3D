@@ -1,11 +1,29 @@
 import numpy as np
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull, QhullError
 
 # Standard 68-point (iBUG/300W) landmark indices used by 3DDFA-V3's ldm68
 NASION = 27
 SUBNASALE = 33
 ALA_LEFT = 31
 ALA_RIGHT = 35
+
+# Eye corner landmarks (iBUG/300W), verified empirically on the canonical shape:
+# the subject's right eye sits at x<0 (indices 36-41), the left at x>0 (42-47).
+EYE_CORNERS = {
+    "right": {"outer": 36, "inner": 39},
+    "left": {"inner": 42, "outer": 45},
+}
+
+
+def _hull_area_volume(points):
+    # Near-planar masks (e.g. eyes) can make Qhull reject the flat initial
+    # simplex; QJ joggles the input just enough to build a hull, at the cost
+    # of a negligible perturbation (volume stays ~0 for a flat patch anyway).
+    try:
+        hull = ConvexHull(points)
+    except QhullError:
+        hull = ConvexHull(points, qhull_options="QJ")
+    return float(hull.area), float(hull.volume)
 
 
 def nasal_index(v3d, ldm68_vertex_idx):
@@ -52,7 +70,7 @@ def nose_dimensions(canonical_shape, vertex_labels, label2id):
         label2id          -- dict, segmentation label name -> id
     """
     nose_points = canonical_shape[vertex_labels == label2id["nose"]]
-    hull = ConvexHull(nose_points)
+    area, volume = _hull_area_volume(nose_points)
 
     leftmost = nose_points[np.argsort(nose_points[:, 0])[:3]].mean(axis=0)
     rightmost = nose_points[np.argsort(nose_points[:, 0])[-3:]].mean(axis=0)
@@ -62,6 +80,69 @@ def nose_dimensions(canonical_shape, vertex_labels, label2id):
     return {
         "nose_width": float(np.abs(leftmost[0] - rightmost[0])),
         "nose_length": float(np.abs(backmost[2] - frontmost[2])),
-        "nose_area": float(hull.area),
-        "nose_volume": float(hull.volume),
+        "nose_area": area,
+        "nose_volume": volume,
+    }
+
+
+def palpebral_fissure_length(v3d, ldm68_vertex_idx, side):
+    """
+    Palpebral fissure length (eye width) = 3D distance between the inner
+    (endocanthion) and outer (exocanthion) corner of one eye. A euclidean
+    distance between two landmarks, so pose-independent like the nasal index.
+
+    Parameters:
+        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
+        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
+        side               -- "left" or "right" (subject's own side)
+    """
+    landmarks = v3d[ldm68_vertex_idx]
+    corners = EYE_CORNERS[side]
+    length = np.linalg.norm(landmarks[corners["inner"]] - landmarks[corners["outer"]])
+    return float(length)
+
+
+def intercanthal_biocular(v3d, ldm68_vertex_idx):
+    """
+    Bilateral horizontal eye measures from the 68 landmarks:
+      - intercanthal width: endocanthion to endocanthion (inner corners)
+      - biocular width: exocanthion to exocanthion (outer corners)
+      - canthal index: (intercanthal / biocular) * 100
+    All euclidean 3D distances, pose-independent. The canthal index is
+    reported as a bare number: unlike the nasal index it has no established
+    classification thresholds anchored in this project's references.
+    """
+    landmarks = v3d[ldm68_vertex_idx]
+    endocanthion_r = landmarks[EYE_CORNERS["right"]["inner"]]
+    endocanthion_l = landmarks[EYE_CORNERS["left"]["inner"]]
+    exocanthion_r = landmarks[EYE_CORNERS["right"]["outer"]]
+    exocanthion_l = landmarks[EYE_CORNERS["left"]["outer"]]
+
+    intercanthal = np.linalg.norm(endocanthion_r - endocanthion_l)
+    biocular = np.linalg.norm(exocanthion_r - exocanthion_l)
+    canthal_index = (intercanthal / biocular) * 100
+
+    return {
+        "intercanthal_width": float(intercanthal),
+        "biocular_width": float(biocular),
+        "canthal_index": float(canthal_index),
+    }
+
+
+def eye_dimensions(canonical_shape, vertex_labels, label2id, side):
+    """
+    Convex-hull area/volume of one eye's segmentation mask, on the canonical
+    (unposed) shape. Secondary signal, analogous to nose area/volume.
+
+    Parameters:
+        side -- "left" or "right" (subject's own side); maps to the
+                 'l_eye'/'r_eye' segmentation labels.
+    """
+    label_key = "l_eye" if side == "left" else "r_eye"
+    eye_points = canonical_shape[vertex_labels == label2id[label_key]]
+    area, volume = _hull_area_volume(eye_points)
+
+    return {
+        "eye_area": area,
+        "eye_volume": volume,
     }

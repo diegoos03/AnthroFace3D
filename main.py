@@ -15,8 +15,14 @@ from core.mapping import map_segmentation_to_mesh
 from core.symmetry import apply_symmetry, apply_nose_lip_symmetry
 from core.constants import label2id, symmetric_translate
 from core.postprocess import clean_labels_with_connectivity
-from core.measurements import nasal_index, nose_dimensions
-from core.parts import nose_part
+from core.measurements import (
+    nasal_index,
+    nose_dimensions,
+    palpebral_fissure_length,
+    intercanthal_biocular,
+    eye_dimensions,
+)
+from core.parts import nose_part, eye_part
 
 
 def main():
@@ -84,8 +90,21 @@ def main():
     print(f"[+] Nose width: {nose_shape['nose_width']:.2f}, length: {nose_shape['nose_length']:.2f}, "
           f"area: {nose_shape['nose_area']:.2f}, volume: {nose_shape['nose_volume']:.2f}")
 
+    v3d = results['v3d'][0]
+    ldm68_idx = recon_model.ldm68.cpu().numpy()
+
+    fissure = {side: palpebral_fissure_length(v3d, ldm68_idx, side) for side in ("left", "right")}
+    eye_dims = {side: eye_dimensions(canonical_shape, v_labels_clean, label2id, side) for side in ("left", "right")}
+    print(f"[+] Palpebral fissure length: left {fissure['left']:.2f}, right {fissure['right']:.2f}")
+
+    # Bilateral eye measures live at the facial level, not inside a single eye
+    eye_bilateral = intercanthal_biocular(v3d, ldm68_idx)
+    print(f"[+] Intercanthal: {eye_bilateral['intercanthal_width']:.2f}, "
+          f"biocular: {eye_bilateral['biocular_width']:.2f}, "
+          f"canthal index: {eye_bilateral['canthal_index']:.2f}")
+
     # Measured parts, for the viewer's per-part isolated 3D views
-    ldm68_canonical = canonical_shape[recon_model.ldm68.cpu().numpy()]
+    ldm68_canonical = canonical_shape[ldm68_idx]
     parts = [
         nose_part(
             canonical_shape=canonical_shape,
@@ -93,6 +112,24 @@ def main():
             label2id=label2id,
             nasal_measurements=nasal_measurements,
             nose_shape=nose_shape,
+            ldm68_canonical=ldm68_canonical,
+        ),
+        eye_part(
+            side="left",
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            fissure_length=fissure["left"],
+            eye_dims=eye_dims["left"],
+            ldm68_canonical=ldm68_canonical,
+        ),
+        eye_part(
+            side="right",
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            fissure_length=fissure["right"],
+            eye_dims=eye_dims["right"],
             ldm68_canonical=ldm68_canonical,
         ),
     ]

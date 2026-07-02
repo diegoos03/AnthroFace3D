@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from core.measurements import EYE_CORNERS
 from core.palette import PART_COLORS
 
 
@@ -51,6 +52,34 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
         key="nose",
         display_name="Nose",
         color=PART_COLORS["nose"],
+        points=canonical_shape[mask],
+        measurements=measurements,
+        landmarks=landmarks,
+    )
+
+
+def eye_part(side, canonical_shape, vertex_labels, label2id, fissure_length, eye_dims, ldm68_canonical=None):
+    label_key = "l_eye" if side == "left" else "r_eye"
+    mask = vertex_labels == label2id[label_key]
+
+    landmarks = {}
+    if ldm68_canonical is not None:
+        corners = EYE_CORNERS[side]
+        landmarks = {
+            "Endocanthion (inner)": ldm68_canonical[corners["inner"]],
+            "Exocanthion (outer)": ldm68_canonical[corners["outer"]],
+        }
+
+    measurements = {
+        "Palpebral fissure length": f"{fissure_length:.3f}",
+        "Area (convex hull)": f"{eye_dims['eye_area']:.3f}",
+        "Volume (convex hull)": f"{eye_dims['eye_volume']:.3f}",
+    }
+
+    return PartResult(
+        key=f"{side}_eye",
+        display_name=f"{side.capitalize()} eye",
+        color=PART_COLORS[label_key],
         points=canonical_shape[mask],
         measurements=measurements,
         landmarks=landmarks,
