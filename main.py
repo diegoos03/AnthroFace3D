@@ -15,7 +15,7 @@ from core.mapping import map_segmentation_to_mesh
 from core.symmetry import apply_symmetry, apply_nose_lip_symmetry
 from core.constants import label2id, symmetric_translate
 from core.postprocess import clean_labels_with_connectivity
-from core.measurements import nasal_index
+from core.measurements import nasal_index, nose_dimensions
 
 
 def main():
@@ -78,6 +78,10 @@ def main():
     # Anthropometric measurements
     nasal_measurements = nasal_index(results['v3d'][0], recon_model.ldm68.cpu().numpy())
     print(f"[+] Nasal Index: {nasal_measurements['nasal_index']:.2f} ({nasal_measurements['category']})")
+
+    nose_shape = nose_dimensions(canonical_shape, v_labels_clean, label2id)
+    print(f"[+] Nose width: {nose_shape['nose_width']:.2f}, length: {nose_shape['nose_length']:.2f}, "
+          f"area: {nose_shape['nose_area']:.2f}, volume: {nose_shape['nose_volume']:.2f}")
 
     # Label names
     label_names = getattr(seg_model.config, "id2label", None)

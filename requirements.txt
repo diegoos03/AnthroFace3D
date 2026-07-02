@@ -1,5 +1,5 @@
 # AnthroFace3D — dependencias directas
-# Generado a partir del entorno venv/ existente (Python 3.13.5)
+# Generado a partir del entorno venv/ existente (Python 3.13.14, nativo)
 # Instalar con: pip install -r requirements.txt
 
 # Deep learning / reconstrucción 3D (3DDFA-V3) y segmentación (SegFormer)
