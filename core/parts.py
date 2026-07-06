@@ -12,7 +12,13 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from core.measurements import EYE_CORNERS
+from core.measurements import (
+    EYE_CORNERS,
+    CHEILION_RIGHT,
+    CHEILION_LEFT,
+    LABIALE_SUPERIUS,
+    LABIALE_INFERIUS,
+)
 from core.palette import PART_COLORS
 
 
@@ -61,6 +67,42 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
         key="nose",
         display_name="Nose",
         color=PART_COLORS["nose"],
+        points=canonical_shape[mask],
+        measurements=measurements,
+        secondary=secondary,
+        landmarks=landmarks,
+    )
+
+
+def mouth_part(canonical_shape, vertex_labels, label2id, mouth_meas, mouth_shape, ldm68_canonical=None):
+    lip_ids = [label2id["u_lip"], label2id["l_lip"], label2id["mouth"]]
+    mask = np.isin(vertex_labels, lip_ids)
+
+    landmarks = {}
+    if ldm68_canonical is not None:
+        landmarks = {
+            "Cheilion (right)": ldm68_canonical[CHEILION_RIGHT],
+            "Cheilion (left)": ldm68_canonical[CHEILION_LEFT],
+            "Labiale superius": ldm68_canonical[LABIALE_SUPERIUS],
+            "Labiale inferius": ldm68_canonical[LABIALE_INFERIUS],
+        }
+
+    # Primary: exact landmark width and the dimensionless mouth/nose ratio.
+    measurements = {
+        "Mouth width (landmarks)": f"{mouth_meas['mouth_width']:.3f}",
+        "Mouth/nose width ratio": f"{mouth_meas['mouth_nose_ratio']:.2f}",
+    }
+
+    # Secondary: segmentation-mask hull, diagnostic only.
+    secondary = {
+        "Area (convex hull)": f"{mouth_shape['mouth_area']:.3f}",
+        "Volume (convex hull)": f"{mouth_shape['mouth_volume']:.3f}",
+    }
+
+    return PartResult(
+        key="mouth",
+        display_name="Mouth",
+        color=PART_COLORS["mouth"],
         points=canonical_shape[mask],
         measurements=measurements,
         secondary=secondary,

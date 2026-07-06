@@ -8,6 +8,14 @@ SUBNASALE = 33
 ALA_LEFT = 31
 ALA_RIGHT = 35
 
+# Mouth landmarks (iBUG/300W). Cheilia (mouth corners) verified empirically on
+# the canonical shape: 48 = subject's right corner (x<0), 54 = left (x>0);
+# they are the most lateral outer-lip points, so they are the true cheilia.
+CHEILION_RIGHT = 48
+CHEILION_LEFT = 54
+LABIALE_SUPERIUS = 51
+LABIALE_INFERIUS = 57
+
 # Eye corner landmarks (iBUG/300W), verified empirically on the canonical shape:
 # the subject's right eye sits at x<0 (indices 36-41), the left at x>0 (42-47).
 EYE_CORNERS = {
@@ -127,6 +135,45 @@ def intercanthal_biocular(v3d, ldm68_vertex_idx):
         "intercanthal_width": float(intercanthal),
         "biocular_width": float(biocular),
         "canthal_index": float(canthal_index),
+    }
+
+
+def mouth_measures(v3d, ldm68_vertex_idx):
+    """
+    Mouth width and the dimensionless mouth/nose width ratio, both from exact
+    68 landmarks:
+      - mouth_width: cheilion-to-cheilion 3D distance (mouth corners).
+      - mouth_nose_ratio: mouth width / nasal (alar) width.
+    Both are euclidean distances between two landmarks, so pose-independent;
+    the ratio is scale-free and comparable across faces, like the nasal index.
+
+    Parameters:
+        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
+        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
+    """
+    landmarks = v3d[ldm68_vertex_idx]
+    m_width = np.linalg.norm(landmarks[CHEILION_LEFT] - landmarks[CHEILION_RIGHT])
+    n_width = np.linalg.norm(landmarks[ALA_LEFT] - landmarks[ALA_RIGHT])
+
+    return {
+        "mouth_width": float(m_width),
+        "mouth_nose_ratio": float(m_width / n_width),
+    }
+
+
+def mouth_dimensions(canonical_shape, vertex_labels, label2id):
+    """
+    Convex-hull area/volume of the lip region (upper lip + lower lip + inner
+    mouth masks), on the canonical (unposed) shape. Secondary segmentation
+    signal, analogous to nose/eye area/volume.
+    """
+    lip_ids = [label2id["u_lip"], label2id["l_lip"], label2id["mouth"]]
+    mouth_points = canonical_shape[np.isin(vertex_labels, lip_ids)]
+    area, volume = _hull_area_volume(mouth_points)
+
+    return {
+        "mouth_area": area,
+        "mouth_volume": volume,
     }
 
 

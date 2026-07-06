@@ -21,9 +21,11 @@ from core.measurements import (
     palpebral_fissure_length,
     intercanthal_biocular,
     eye_dimensions,
+    mouth_measures,
+    mouth_dimensions,
     facial_angles,
 )
-from core.parts import nose_part, eye_part
+from core.parts import nose_part, eye_part, mouth_part
 
 
 def main():
@@ -101,6 +103,13 @@ def main():
     eye_dims = {side: eye_dimensions(canonical_shape, v_labels_clean, label2id, side) for side in ("left", "right")}
     print(f"[+] Palpebral fissure length: left {fissure['left']:.2f}, right {fissure['right']:.2f}")
 
+    # Mouth: exact landmark width + dimensionless mouth/nose ratio (primary),
+    # plus the segmentation-hull dimensions (secondary/diagnostic).
+    mouth_meas = mouth_measures(v3d, ldm68_idx)
+    mouth_shape = mouth_dimensions(canonical_shape, v_labels_clean, label2id)
+    print(f"[+] Mouth width: {mouth_meas['mouth_width']:.2f}, "
+          f"mouth/nose ratio: {mouth_meas['mouth_nose_ratio']:.2f}")
+
     # Bilateral eye measures live at the facial level, not inside a single eye
     eye_bilateral = intercanthal_biocular(v3d, ldm68_idx)
     print(f"[+] Intercanthal: {eye_bilateral['intercanthal_width']:.2f}, "
@@ -145,6 +154,14 @@ def main():
             label2id=label2id,
             fissure_length=fissure["right"],
             eye_dims=eye_dims["right"],
+            ldm68_canonical=ldm68_canonical,
+        ),
+        mouth_part(
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            mouth_meas=mouth_meas,
+            mouth_shape=mouth_shape,
             ldm68_canonical=ldm68_canonical,
         ),
     ]
