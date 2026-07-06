@@ -7,7 +7,6 @@ PRONASALE = 30
 SUBNASALE = 33
 ALA_LEFT = 31
 ALA_RIGHT = 35
-GNATHION = 8
 
 # Eye corner landmarks (iBUG/300W), verified empirically on the canonical shape:
 # the subject's right eye sits at x<0 (indices 36-41), the left at x>0 (42-47).
@@ -145,23 +144,22 @@ def _angle_at(vertex, a, b):
 
 def facial_angles(v3d, ldm68_vertex_idx):
     """
-    Soft-tissue facial profile angles from the 68 midline landmarks. Angles
-    are dimensionless and pose-invariant, an ideal descriptor family given the
-    3DMM carries no absolute scale.
+    Dimensionless, pose-invariant profile angles from the 68 midline
+    landmarks -- an ideal descriptor family given the 3DMM carries no absolute
+    scale. Only angles whose three landmarks are exact are reported: no proxies.
 
-    Computed as 3D angles at the vertex landmark. Because the midline points
-    (nasion, pronasale, subnasale, gnathion) lie ~on the midsagittal plane,
-    these match the classic profile-view angles closely.
+    Currently that is a single angle:
+      - nasal_tip_angle: nasion-pronasale-subnasale, all exact midline points.
 
-    Two of these are proxies for their clinical definitions, because the 68
-    landmarks lack glabella, pogonion and the columella point:
-      - nasal_tip_angle: nasion-pronasale-subnasale, all clean midline points.
-      - nasomental_angle: nasion-pronasale-gnathion (gnathion ~ pogonion).
-      - facial_convexity_angle: nasion-subnasale-gnathion (nasion ~ glabella,
-        gnathion ~ pogonion), so it runs sharper than the glabella-based value.
-    The clinical nasolabial angle is deliberately omitted: it needs a columella
-    tangent that no 68-point landmark provides, and proxying it with the nose
-    tip yields a near-straight, meaningless angle.
+    Other classic profile angles are deliberately NOT computed here, because
+    the 68/106/134 landmark sets (all the same face-alignment family) lack the
+    points they require and would force approximations:
+      - nasolabial angle needs a columella-apex point (absent in every set;
+        the 106 nostril-base points sit at subnasale depth, so proxying gives
+        a near-straight, meaningless angle).
+      - nasomental / facial convexity need pogonion and glabella; the sets have
+        neither (menton/nasion are not those points, and no set has forehead
+        landmarks). Getting those is the cephalometric-refinement route.
 
     Parameters:
         v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
@@ -171,12 +169,9 @@ def facial_angles(v3d, ldm68_vertex_idx):
     nasion = landmarks[NASION]
     pronasale = landmarks[PRONASALE]
     subnasale = landmarks[SUBNASALE]
-    gnathion = landmarks[GNATHION]
 
     return {
         "nasal_tip_angle": _angle_at(pronasale, nasion, subnasale),
-        "nasomental_angle": _angle_at(pronasale, nasion, gnathion),
-        "facial_convexity_angle": _angle_at(subnasale, nasion, gnathion),
     }
 
 

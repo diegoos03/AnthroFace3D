@@ -107,19 +107,15 @@ def main():
           f"biocular: {eye_bilateral['biocular_width']:.2f}, "
           f"canthal index: {eye_bilateral['canthal_index']:.2f}")
 
-    # Dimensionless profile angles, also facial-level (midline landmarks)
+    # Dimensionless profile angle, also facial-level (exact midline landmarks)
     angles = facial_angles(v3d, ldm68_idx)
-    print(f"[+] Nasal tip: {angles['nasal_tip_angle']:.1f}°, "
-          f"nasomental: {angles['nasomental_angle']:.1f}°, "
-          f"facial convexity: {angles['facial_convexity_angle']:.1f}°")
+    print(f"[+] Nasal tip angle: {angles['nasal_tip_angle']:.1f}°")
 
     # Facial-level measures (dimensionless ratios and angles): they have no
     # per-part mask, so they are reported as a summary rather than a 3D view.
     facial_measures = {
         "Canthal index": f"{eye_bilateral['canthal_index']:.2f}",
         "Nasal tip angle": f"{angles['nasal_tip_angle']:.1f}°",
-        "Nasomental angle": f"{angles['nasomental_angle']:.1f}°",
-        "Facial convexity angle": f"{angles['facial_convexity_angle']:.1f}°",
     }
 
     # Measured parts, for the viewer's per-part isolated 3D views
