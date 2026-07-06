@@ -21,6 +21,7 @@ from core.measurements import (
     palpebral_fissure_length,
     intercanthal_biocular,
     eye_dimensions,
+    facial_angles,
 )
 from core.parts import nose_part, eye_part
 
@@ -106,6 +107,21 @@ def main():
           f"biocular: {eye_bilateral['biocular_width']:.2f}, "
           f"canthal index: {eye_bilateral['canthal_index']:.2f}")
 
+    # Dimensionless profile angles, also facial-level (midline landmarks)
+    angles = facial_angles(v3d, ldm68_idx)
+    print(f"[+] Nasal tip: {angles['nasal_tip_angle']:.1f}°, "
+          f"nasomental: {angles['nasomental_angle']:.1f}°, "
+          f"facial convexity: {angles['facial_convexity_angle']:.1f}°")
+
+    # Facial-level measures (dimensionless ratios and angles): they have no
+    # per-part mask, so they are reported as a summary rather than a 3D view.
+    facial_measures = {
+        "Canthal index": f"{eye_bilateral['canthal_index']:.2f}",
+        "Nasal tip angle": f"{angles['nasal_tip_angle']:.1f}°",
+        "Nasomental angle": f"{angles['nasomental_angle']:.1f}°",
+        "Facial convexity angle": f"{angles['facial_convexity_angle']:.1f}°",
+    }
+
     # Measured parts, for the viewer's per-part isolated 3D views
     ldm68_canonical = canonical_shape[ldm68_idx]
     parts = [
@@ -151,6 +167,7 @@ def main():
         vertex_labels=v_labels_clean,
         label_names=label_names,
         parts=parts,
+        facial_measures=facial_measures,
     )
 
     print(f"[+] Results panel saved to: {panel_path}")

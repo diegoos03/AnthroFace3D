@@ -3,9 +3,11 @@ from scipy.spatial import ConvexHull, QhullError
 
 # Standard 68-point (iBUG/300W) landmark indices used by 3DDFA-V3's ldm68
 NASION = 27
+PRONASALE = 30
 SUBNASALE = 33
 ALA_LEFT = 31
 ALA_RIGHT = 35
+GNATHION = 8
 
 # Eye corner landmarks (iBUG/300W), verified empirically on the canonical shape:
 # the subject's right eye sits at x<0 (indices 36-41), the left at x>0 (42-47).
@@ -126,6 +128,55 @@ def intercanthal_biocular(v3d, ldm68_vertex_idx):
         "intercanthal_width": float(intercanthal),
         "biocular_width": float(biocular),
         "canthal_index": float(canthal_index),
+    }
+
+
+def _angle_at(vertex, a, b):
+    """
+    Angle in degrees at `vertex`, subtended by points a and b. Being an angle
+    between two directions, it is invariant to rotation, translation and
+    uniform scale -- so it needs no metric unit, unlike a raw distance.
+    """
+    va = a - vertex
+    vb = b - vertex
+    cos = np.dot(va, vb) / (np.linalg.norm(va) * np.linalg.norm(vb))
+    return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
+
+
+def facial_angles(v3d, ldm68_vertex_idx):
+    """
+    Soft-tissue facial profile angles from the 68 midline landmarks. Angles
+    are dimensionless and pose-invariant, an ideal descriptor family given the
+    3DMM carries no absolute scale.
+
+    Computed as 3D angles at the vertex landmark. Because the midline points
+    (nasion, pronasale, subnasale, gnathion) lie ~on the midsagittal plane,
+    these match the classic profile-view angles closely.
+
+    Two of these are proxies for their clinical definitions, because the 68
+    landmarks lack glabella, pogonion and the columella point:
+      - nasal_tip_angle: nasion-pronasale-subnasale, all clean midline points.
+      - nasomental_angle: nasion-pronasale-gnathion (gnathion ~ pogonion).
+      - facial_convexity_angle: nasion-subnasale-gnathion (nasion ~ glabella,
+        gnathion ~ pogonion), so it runs sharper than the glabella-based value.
+    The clinical nasolabial angle is deliberately omitted: it needs a columella
+    tangent that no 68-point landmark provides, and proxying it with the nose
+    tip yields a near-straight, meaningless angle.
+
+    Parameters:
+        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
+        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
+    """
+    landmarks = v3d[ldm68_vertex_idx]
+    nasion = landmarks[NASION]
+    pronasale = landmarks[PRONASALE]
+    subnasale = landmarks[SUBNASALE]
+    gnathion = landmarks[GNATHION]
+
+    return {
+        "nasal_tip_angle": _angle_at(pronasale, nasion, subnasale),
+        "nasomental_angle": _angle_at(pronasale, nasion, gnathion),
+        "facial_convexity_angle": _angle_at(subnasale, nasion, gnathion),
     }
 
 

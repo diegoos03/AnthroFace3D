@@ -280,9 +280,11 @@ def launch_results_viewer(
     vertex_labels=None,
     label_names=None,
     parts=None,
+    facial_measures=None,
     save_path="results/pipeline_panels.png",
 ):
     parts = parts or []
+    facial_measures = facial_measures or {}
 
     results_figure = create_results_figure(image, labels, results, points)
     output_path = _save_figure(results_figure, save_path)
@@ -356,6 +358,17 @@ def launch_results_viewer(
 
     parts_title = ttk.Label(parts_content, text="Measured Parts", font=("TkDefaultFont", 14, "bold"))
     parts_title.pack(anchor="w", pady=(0, 4))
+
+    if facial_measures:
+        facial_title = ttk.Label(
+            parts_content, text="Facial ratios & angles (dimensionless)", font=("TkDefaultFont", 12, "bold")
+        )
+        facial_title.pack(anchor="w", pady=(8, 2))
+        facial_text = "    ".join(f"{key}: {value}" for key, value in facial_measures.items())
+        facial_summary = ttk.Label(
+            parts_content, text=facial_text, style="Secondary.TLabel", wraplength=900, justify="left"
+        )
+        facial_summary.pack(anchor="w", pady=(0, 12))
 
     if parts:
         parts_description = ttk.Label(
