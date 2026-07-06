@@ -6,17 +6,25 @@ from core.measurements import (
     mouth_measures,
     intercanthal_biocular,
     facial_angles,
+    eyebrow_measures,
 )
 
 # The dimensionless primary measures validated by the synthetic round-trip.
-# All are scale-free (ratios or an angle), so comparing the true value against
+# All are scale-free (ratios or angles), so comparing the true value against
 # the recovered one is meaningful even though the 3DMM has no metric unit.
-def dimensionless_measures(v3d_np, ldm68_idx):
+# The first four are pose-invariant on the posed shape (v3d); the eyebrow tilt
+# is a frontal-plane angle, so it is measured on the canonical (unposed) shape.
+def dimensionless_measures(v3d_np, canonical_np, ldm68_idx):
+    brow_tilt = 0.5 * (
+        eyebrow_measures(canonical_np, ldm68_idx, "left")["eyebrow_tilt"]
+        + eyebrow_measures(canonical_np, ldm68_idx, "right")["eyebrow_tilt"]
+    )
     return {
         "nasal_index": nasal_index(v3d_np, ldm68_idx)["nasal_index"],
         "mouth_nose_ratio": mouth_measures(v3d_np, ldm68_idx)["mouth_nose_ratio"],
         "canthal_index": intercanthal_biocular(v3d_np, ldm68_idx)["canthal_index"],
         "nasal_tip_angle": facial_angles(v3d_np, ldm68_idx)["nasal_tip_angle"],
+        "eyebrow_tilt": brow_tilt,
     }
 
 
@@ -73,14 +81,16 @@ def _mesh_and_render(recon_model, alpha):
         v3d.clone(), recon_model.tri, torch.clamp(face_texture, 0, 1).clone(), visible_vertice=True
     )
     render = pred_image.permute(0, 2, 3, 1)[0]  # (H, W, 3) in [0, 1]
-    return v3d, render
+    return v3d, face_shape, render
 
 
 def true_measures(recon_model, alpha, ldm68_idx):
     """Measures computed directly on the known generated mesh (ground truth)."""
     with torch.no_grad():
-        v3d, _ = _mesh_and_render(recon_model, alpha)
-    return dimensionless_measures(v3d.detach().cpu().numpy()[0], ldm68_idx)
+        v3d, face_shape, _ = _mesh_and_render(recon_model, alpha)
+    return dimensionless_measures(
+        v3d.detach().cpu().numpy()[0], face_shape.detach().cpu().numpy()[0], ldm68_idx
+    )
 
 
 def recovered_measures(recon_model, alpha, ldm68_idx, device):
@@ -92,7 +102,7 @@ def recovered_measures(recon_model, alpha, ldm68_idx, device):
     synthetic render).
     """
     with torch.no_grad():
-        _, render = _mesh_and_render(recon_model, alpha)
+        _, _, render = _mesh_and_render(recon_model, alpha)
         recon_model.input_img = render.permute(2, 0, 1).unsqueeze(0).contiguous().to(device)
         results = recon_model.forward()
-    return dimensionless_measures(results["v3d"][0], ldm68_idx)
+    return dimensionless_measures(results["v3d"][0], results["face_shape"][0], ldm68_idx)

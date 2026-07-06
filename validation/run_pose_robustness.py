@@ -22,7 +22,7 @@ from validation.synthetic import (
 # checks whether they actually hold as self-occlusion grows with yaw.
 YAW_DEGREES = [-45, -30, -15, 0, 15, 30, 45]
 
-MEASURES = ["nasal_index", "mouth_nose_ratio", "canthal_index", "nasal_tip_angle"]
+MEASURES = ["nasal_index", "mouth_nose_ratio", "canthal_index", "nasal_tip_angle", "eyebrow_tilt"]
 
 
 def run(image_path="examples/foto_5.jpg"):
