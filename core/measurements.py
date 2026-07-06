@@ -23,6 +23,13 @@ EYE_CORNERS = {
     "left": {"inner": 42, "outer": 45},
 }
 
+# Eyebrow endpoints (iBUG/300W), verified empirically: right brow 17-21 (x<0),
+# left brow 22-26 (x>0); medial = end nearest the midline, lateral = temple end.
+BROW_ENDS = {
+    "right": {"medial": 21, "lateral": 17},
+    "left": {"medial": 22, "lateral": 26},
+}
+
 
 def _hull_area_volume(points):
     # Near-planar masks (e.g. eyes) can make Qhull reject the flat initial
@@ -187,6 +194,60 @@ def _angle_at(vertex, a, b):
     vb = b - vertex
     cos = np.dot(va, vb) / (np.linalg.norm(va) * np.linalg.norm(vb))
     return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
+
+
+def _acute_vector_angle(v1, v2):
+    """Acute angle in degrees between two free vectors (undirected), in [0, 90]."""
+    cos = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    ang = np.degrees(np.arccos(np.clip(cos, -1.0, 1.0)))
+    return float(min(ang, 180.0 - ang))
+
+
+def eyebrow_measures(canonical_shape, ldm68_vertex_idx, side):
+    """
+    Per-eyebrow measures from exact 68 landmarks, on the canonical (unposed)
+    shape so they are pose-invariant:
+      - eyebrow_length: 3D chord distance medial-to-lateral brow endpoint.
+      - eyebrow_tilt: acute angle (degrees) between the brow chord and the
+        biocular axis (exocanthion-to-exocanthion), measured in the FRONTAL
+        (x, y) plane only. The frontal projection is deliberate: the full-3D
+        brow chord wraps backward toward the temple (large z), which would
+        conflate that temporal wrap with the up/down slant that "tilt" means.
+        Working in the canonical frame keeps the frontal angle pose-invariant.
+
+    Parameters:
+        canonical_shape   -- np.ndarray, size (N, 3), unposed mesh vertices
+        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
+        side               -- "left" or "right" (subject's own side)
+    """
+    landmarks = canonical_shape[ldm68_vertex_idx]
+    ends = BROW_ENDS[side]
+    brow_chord = landmarks[ends["lateral"]] - landmarks[ends["medial"]]
+    biocular_axis = landmarks[EYE_CORNERS["left"]["outer"]] - landmarks[EYE_CORNERS["right"]["outer"]]
+
+    return {
+        "eyebrow_length": float(np.linalg.norm(brow_chord)),
+        "eyebrow_tilt": _acute_vector_angle(brow_chord[:2], biocular_axis[:2]),
+    }
+
+
+def eyebrow_dimensions(canonical_shape, vertex_labels, label2id, side):
+    """
+    Convex-hull area/volume of one eyebrow's segmentation mask, on the
+    canonical (unposed) shape. Secondary signal, analogous to eye area/volume.
+
+    Parameters:
+        side -- "left" or "right" (subject's own side); maps to the
+                 'l_brow'/'r_brow' segmentation labels.
+    """
+    label_key = "l_brow" if side == "left" else "r_brow"
+    brow_points = canonical_shape[vertex_labels == label2id[label_key]]
+    area, volume = _hull_area_volume(brow_points)
+
+    return {
+        "brow_area": area,
+        "brow_volume": volume,
+    }
 
 
 def facial_angles(v3d, ldm68_vertex_idx):

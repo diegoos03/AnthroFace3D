@@ -14,6 +14,7 @@ import numpy as np
 
 from core.measurements import (
     EYE_CORNERS,
+    BROW_ENDS,
     CHEILION_RIGHT,
     CHEILION_LEFT,
     LABIALE_SUPERIUS,
@@ -67,6 +68,41 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
         key="nose",
         display_name="Nose",
         color=PART_COLORS["nose"],
+        points=canonical_shape[mask],
+        measurements=measurements,
+        secondary=secondary,
+        landmarks=landmarks,
+    )
+
+
+def eyebrow_part(side, canonical_shape, vertex_labels, label2id, brow_meas, brow_dims, ldm68_canonical=None):
+    label_key = "l_brow" if side == "left" else "r_brow"
+    mask = vertex_labels == label2id[label_key]
+
+    landmarks = {}
+    if ldm68_canonical is not None:
+        ends = BROW_ENDS[side]
+        landmarks = {
+            "Medial end": ldm68_canonical[ends["medial"]],
+            "Lateral end": ldm68_canonical[ends["lateral"]],
+        }
+
+    # Primary: exact landmark length + dimensionless, pose-invariant tilt angle.
+    measurements = {
+        "Eyebrow length": f"{brow_meas['eyebrow_length']:.3f}",
+        "Eyebrow tilt": f"{brow_meas['eyebrow_tilt']:.1f}°",
+    }
+
+    # Secondary: segmentation-mask hull, diagnostic only.
+    secondary = {
+        "Area (convex hull)": f"{brow_dims['brow_area']:.3f}",
+        "Volume (convex hull)": f"{brow_dims['brow_volume']:.3f}",
+    }
+
+    return PartResult(
+        key=f"{side}_brow",
+        display_name=f"{side.capitalize()} eyebrow",
+        color=PART_COLORS[label_key],
         points=canonical_shape[mask],
         measurements=measurements,
         secondary=secondary,

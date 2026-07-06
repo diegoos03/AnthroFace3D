@@ -21,11 +21,13 @@ from core.measurements import (
     palpebral_fissure_length,
     intercanthal_biocular,
     eye_dimensions,
+    eyebrow_measures,
+    eyebrow_dimensions,
     mouth_measures,
     mouth_dimensions,
     facial_angles,
 )
-from core.parts import nose_part, eye_part, mouth_part
+from core.parts import nose_part, eye_part, eyebrow_part, mouth_part
 
 
 def main():
@@ -103,6 +105,13 @@ def main():
     eye_dims = {side: eye_dimensions(canonical_shape, v_labels_clean, label2id, side) for side in ("left", "right")}
     print(f"[+] Palpebral fissure length: left {fissure['left']:.2f}, right {fissure['right']:.2f}")
 
+    # Eyebrows: exact length + dimensionless, pose-invariant tilt (primary),
+    # plus segmentation-hull dimensions (secondary/diagnostic).
+    brow_meas = {side: eyebrow_measures(canonical_shape, ldm68_idx, side) for side in ("left", "right")}
+    brow_dims = {side: eyebrow_dimensions(canonical_shape, v_labels_clean, label2id, side) for side in ("left", "right")}
+    print(f"[+] Eyebrow tilt: left {brow_meas['left']['eyebrow_tilt']:.1f}°, "
+          f"right {brow_meas['right']['eyebrow_tilt']:.1f}°")
+
     # Mouth: exact landmark width + dimensionless mouth/nose ratio (primary),
     # plus the segmentation-hull dimensions (secondary/diagnostic).
     mouth_meas = mouth_measures(v3d, ldm68_idx)
@@ -154,6 +163,24 @@ def main():
             label2id=label2id,
             fissure_length=fissure["right"],
             eye_dims=eye_dims["right"],
+            ldm68_canonical=ldm68_canonical,
+        ),
+        eyebrow_part(
+            side="left",
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            brow_meas=brow_meas["left"],
+            brow_dims=brow_dims["left"],
+            ldm68_canonical=ldm68_canonical,
+        ),
+        eyebrow_part(
+            side="right",
+            canonical_shape=canonical_shape,
+            vertex_labels=v_labels_clean,
+            label2id=label2id,
+            brow_meas=brow_meas["right"],
+            brow_dims=brow_dims["right"],
             ldm68_canonical=ldm68_canonical,
         ),
         mouth_part(
