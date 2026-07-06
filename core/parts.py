@@ -22,7 +22,8 @@ class PartResult:
     display_name: str
     color: str
     points: np.ndarray                        # (N, 3) vertices belonging to this part
-    measurements: dict                        # label -> formatted value string
+    measurements: dict                        # label -> formatted value string (primary: indices + landmark inputs)
+    secondary: dict = field(default_factory=dict)   # label -> value; segmentation-derived, diagnostic only
     landmarks: dict = field(default_factory=dict)   # label -> (3,) point
 
 
@@ -38,10 +39,18 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
             "Right ala": ldm68_canonical[35],
         }
 
+    # Primary: the dimensionless index and its landmark-based inputs (stable,
+    # pose-invariant). The raw widths carry no metric unit, so they only make
+    # sense as the ingredients of the index, not as standalone measurements.
     measurements = {
         "Nasal Index": f"{nasal_measurements['nasal_index']:.2f} ({nasal_measurements['category']})",
         "Nasal width (landmarks)": f"{nasal_measurements['nasal_width']:.3f}",
         "Nasal height (landmarks)": f"{nasal_measurements['nasal_height']:.3f}",
+    }
+
+    # Secondary: everything derived from the segmentation mask. Unreliable
+    # (the mask over-segments) and unit-less, kept only as a coherence check.
+    secondary = {
         "Width (segmentation)": f"{nose_shape['nose_width']:.3f}",
         "Length (segmentation)": f"{nose_shape['nose_length']:.3f}",
         "Area (convex hull)": f"{nose_shape['nose_area']:.3f}",
@@ -54,6 +63,7 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
         color=PART_COLORS["nose"],
         points=canonical_shape[mask],
         measurements=measurements,
+        secondary=secondary,
         landmarks=landmarks,
     )
 
@@ -70,8 +80,14 @@ def eye_part(side, canonical_shape, vertex_labels, label2id, fissure_length, eye
             "Exocanthion (outer)": ldm68_canonical[corners["outer"]],
         }
 
+    # Primary: the landmark-based fissure length (stable, pose-invariant).
     measurements = {
         "Palpebral fissure length": f"{fissure_length:.3f}",
+    }
+
+    # Secondary: segmentation-mask hull. Unreliable and unit-less; the eye is
+    # near-planar so its volume is uninformative (~0). Coherence check only.
+    secondary = {
         "Area (convex hull)": f"{eye_dims['eye_area']:.3f}",
         "Volume (convex hull)": f"{eye_dims['eye_volume']:.3f}",
     }
@@ -82,5 +98,6 @@ def eye_part(side, canonical_shape, vertex_labels, label2id, fissure_length, eye
         color=PART_COLORS[label_key],
         points=canonical_shape[mask],
         measurements=measurements,
+        secondary=secondary,
         landmarks=landmarks,
     )

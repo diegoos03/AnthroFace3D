@@ -245,6 +245,15 @@ def _build_part_row(parent, part, root):
     summary = ttk.Label(row, text=summary_text, style="Secondary.TLabel", wraplength=760, justify="left")
     summary.grid(row=1, column=1, sticky="w", pady=(2, 0))
 
+    next_row = 2
+    if part.secondary:
+        secondary_text = "Secondary (segmentation, diagnostic only): " + "    ".join(
+            f"{key}: {value}" for key, value in part.secondary.items()
+        )
+        secondary_label = ttk.Label(row, text=secondary_text, style="Muted.TLabel", wraplength=760, justify="left")
+        secondary_label.grid(row=next_row, column=1, sticky="w", pady=(2, 0))
+        next_row += 1
+
     status_var = tk.StringVar(value="")
     status_label = ttk.Label(row, textvariable=status_var, style="Muted.TLabel", wraplength=760, justify="left")
 
@@ -258,7 +267,7 @@ def _build_part_row(parent, part, root):
 
     button = ttk.Button(row, text=f"Open {part.display_name} in browser", command=_open)
     button.grid(row=0, column=2, rowspan=2, padx=(20, 0), sticky="e")
-    status_label.grid(row=2, column=1, columnspan=2, sticky="w", pady=(4, 0))
+    status_label.grid(row=next_row, column=1, columnspan=2, sticky="w", pady=(4, 0))
 
     return row
 
