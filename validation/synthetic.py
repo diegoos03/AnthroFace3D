@@ -46,6 +46,17 @@ def sample_identity(alpha_base, sigma, generator):
     return alpha
 
 
+def set_pose(alpha, pitch=0.0, yaw=0.0, roll=0.0):
+    """
+    Return a copy of alpha with its pose block (angles 224:227, in radians)
+    overwritten. Order is [pitch(x), yaw(y), roll(z)] per compute_rotation;
+    yaw is the left-right turn that drives self-occlusion.
+    """
+    alpha = alpha.clone()
+    alpha[0, 224:227] = torch.tensor([pitch, yaw, roll], dtype=alpha.dtype, device=alpha.device)
+    return alpha
+
+
 def _mesh_and_render(recon_model, alpha):
     """Rebuild the mesh and its shaded render from a coefficient vector,
     replicating the relevant steps of recon_model.forward()."""
