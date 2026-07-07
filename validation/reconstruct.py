@@ -13,7 +13,7 @@ from core.inference import run_3ddfa, project_to_original_image
 from core.mapping import map_segmentation_to_mesh
 from core.symmetry import apply_symmetry, apply_nose_lip_symmetry
 from core.constants import label2id, symmetric_translate
-from core.postprocess import clean_labels_with_connectivity
+from core.postprocess import merge_eyeglasses_labels, clean_labels_with_connectivity
 
 
 def reconstruct_from_image(image_path):
@@ -34,6 +34,8 @@ def reconstruct_from_image(image_path):
 
     v_labels = map_segmentation_to_mesh(labels, points)
     canonical_shape = results["face_shape"][0]
+    ldm68_idx = recon_model.ldm68.cpu().numpy()
+    v_labels = merge_eyeglasses_labels(canonical_shape, v_labels, label2id, ldm68_idx)
     v_labels = apply_symmetry(points=canonical_shape, labels=v_labels, results=results, symmetric_translate=symmetric_translate)
     v_labels = apply_nose_lip_symmetry(points=canonical_shape, labels=v_labels, angle=results["angle"], label2id=label2id, symmetric_translate=symmetric_translate)
     v_labels = clean_labels_with_connectivity(points=canonical_shape, labels=v_labels, label2id=label2id)
@@ -43,5 +45,5 @@ def reconstruct_from_image(image_path):
         "results": results,
         "canonical_shape": canonical_shape,
         "seg_vertex_labels": v_labels,
-        "ldm68_idx": recon_model.ldm68.cpu().numpy(),
+        "ldm68_idx": ldm68_idx,
     }

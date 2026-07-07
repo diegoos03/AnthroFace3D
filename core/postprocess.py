@@ -7,6 +7,55 @@ from scipy.spatial import cKDTree
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
+from core.measurements import EYE_CORNERS
+
+
+def merge_eyeglasses_labels(points, labels, label2id, ldm68_vertex_idx):
+    """
+    Fold the eyeglasses mask (eye_g) into the eyes so glasses never block the
+    per-eye measures. Each eye_g vertex within ~1.2x the palpebral-fissure
+    length of an eye-corner landmark is reassigned to the nearer eye
+    (l_eye/r_eye); the rest (frame bridge, temple arms) becomes skin. Without
+    this a subject wearing glasses leaves l_eye/r_eye nearly empty, degrading
+    the secondary eye area/volume signal -- the landmark-based eye measures
+    (fissure, intercanthal, biocular) never touch the mask, so they are
+    unaffected. Operates on the canonical (unposed) shape.
+
+    Parameters:
+        points             -- np.ndarray, size (N, 3), canonical (unposed) vertices
+        labels              -- np.ndarray, size (N,), per-vertex segmentation labels
+        label2id            -- dict, segmentation label name -> id
+        ldm68_vertex_idx    -- np.ndarray, size (68,), vertex indices for the 68 landmarks
+    """
+    labels = labels.copy().astype(int)
+
+    mask = labels == label2id["eye_g"]
+    if not mask.any():
+        return labels
+
+    lm = points[ldm68_vertex_idx]
+    left_corners = np.stack([lm[EYE_CORNERS["left"]["inner"]], lm[EYE_CORNERS["left"]["outer"]]])
+    right_corners = np.stack([lm[EYE_CORNERS["right"]["inner"]], lm[EYE_CORNERS["right"]["outer"]]])
+
+    # Scale reference: the mean palpebral fissure length across both eyes.
+    fissure = 0.5 * (
+        np.linalg.norm(left_corners[0] - left_corners[1])
+        + np.linalg.norm(right_corners[0] - right_corners[1])
+    )
+    radius = 1.2 * fissure
+
+    idx = np.where(mask)[0]
+    P = points[idx]
+    d_left = np.linalg.norm(P[:, None, :] - left_corners[None], axis=2).min(axis=1)
+    d_right = np.linalg.norm(P[:, None, :] - right_corners[None], axis=2).min(axis=1)
+    nearest = np.minimum(d_left, d_right)
+
+    new = np.where(d_left <= d_right, label2id["l_eye"], label2id["r_eye"])
+    new = np.where(nearest <= radius, new, label2id["skin"])
+    labels[idx] = new
+
+    return labels
+
 
 def clean_labels_with_connectivity(points, labels, label2id, k=8):
 

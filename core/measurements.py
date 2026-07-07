@@ -32,13 +32,21 @@ BROW_ENDS = {
 
 
 def _hull_area_volume(points):
-    # Near-planar masks (e.g. eyes) can make Qhull reject the flat initial
-    # simplex; QJ joggles the input just enough to build a hull, at the cost
-    # of a negligible perturbation (volume stays ~0 for a flat patch anyway).
+    # A convex hull needs at least 4 points; an empty or tiny mask (e.g. an
+    # occluded part, or an eye hidden behind glasses on a different photo) has
+    # no hull, so we report NaN rather than crashing. Near-planar masks (e.g.
+    # eyes) can still make Qhull reject the flat initial simplex; QJ joggles
+    # the input just enough to build a hull, at the cost of a negligible
+    # perturbation (volume stays ~0 for a flat patch anyway).
+    if len(points) < 4:
+        return float("nan"), float("nan")
     try:
         hull = ConvexHull(points)
     except QhullError:
-        hull = ConvexHull(points, qhull_options="QJ")
+        try:
+            hull = ConvexHull(points, qhull_options="QJ")
+        except QhullError:
+            return float("nan"), float("nan")
     return float(hull.area), float(hull.volume)
 
 
@@ -86,6 +94,10 @@ def nose_dimensions(canonical_shape, vertex_labels, label2id):
         label2id          -- dict, segmentation label name -> id
     """
     nose_points = canonical_shape[vertex_labels == label2id["nose"]]
+    if len(nose_points) == 0:
+        nan = float("nan")
+        return {"nose_width": nan, "nose_length": nan, "nose_area": nan, "nose_volume": nan}
+
     area, volume = _hull_area_volume(nose_points)
 
     leftmost = nose_points[np.argsort(nose_points[:, 0])[:3]].mean(axis=0)
