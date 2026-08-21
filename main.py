@@ -319,8 +319,8 @@ def main():
         description="AnthroFace3D: craniofacial anthropometric measurements from a 2D image."
     )
     parser.add_argument(
-        "images", nargs="*", default=["examples/foto_5.jpg"],
-        help="image files or directories to process (default: examples/foto_5.jpg)"
+        "images", nargs="*", default=["examples/1.jpg"],
+        help="image files or directories to process (default: examples/1.jpg)"
     )
     parser.add_argument(
         "--csv", metavar="PATH",
