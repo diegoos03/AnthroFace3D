@@ -28,6 +28,9 @@ from core.measurements import (
     mouth_measures,
     mouth_dimensions,
     facial_angles,
+    facial_index,
+    facial_width_ratios,
+    facial_asymmetry,
 )
 from core.parts import nose_part, eye_part, eyebrow_part, mouth_part
 
@@ -44,6 +47,9 @@ CSV_FIELDS = [
     "eyebrow_length_left", "eyebrow_tilt_left",
     "eyebrow_length_right", "eyebrow_tilt_right",
     "nasal_tip_angle",
+    "facial_index", "facial_height", "facial_width",
+    "naso_intercanthal_ratio", "fissure_biocular_ratio", "mouth_biocular_ratio",
+    "fissure_asymmetry", "eyebrow_length_asymmetry",
     # Secondary (segmentation, diagnostic only)
     "nose_width", "nose_length", "nose_area", "nose_volume",
     "eye_area_left", "eye_volume_left", "eye_area_right", "eye_volume_right",
@@ -176,11 +182,23 @@ def run_pipeline(models, image_path):
     angles = facial_angles(v3d, ldm68_idx)
     print(f"[+] Nasal tip angle: {angles['nasal_tip_angle']:.1f}°")
 
+    # Global facial index and further dimensionless ratios / asymmetry indices
+    facial_idx = facial_index(v3d, ldm68_idx)
+    width_ratios = facial_width_ratios(v3d, ldm68_idx)
+    asymmetry = facial_asymmetry(v3d, canonical_shape, ldm68_idx)
+    print(f"[+] Facial index: {facial_idx['facial_index']:.1f}")
+
     # Facial-level measures (dimensionless ratios and angles): they have no
     # per-part mask, so they are reported as a summary rather than a 3D view.
     facial_measures = {
+        "Facial index": f"{facial_idx['facial_index']:.2f}",
         "Canthal index": f"{eye_bilateral['canthal_index']:.2f}",
         "Nasal tip angle": f"{angles['nasal_tip_angle']:.1f}°",
+        "Naso-intercanthal ratio": f"{width_ratios['naso_intercanthal_ratio']:.2f}",
+        "Fissure/biocular ratio": f"{width_ratios['fissure_biocular_ratio']:.2f}",
+        "Mouth/biocular ratio": f"{width_ratios['mouth_biocular_ratio']:.2f}",
+        "Fissure asymmetry": f"{asymmetry['fissure_asymmetry']:.3f}",
+        "Eyebrow length asymmetry": f"{asymmetry['eyebrow_length_asymmetry']:.3f}",
     }
 
     # Measured parts, for the viewer's per-part isolated 3D views
@@ -259,6 +277,14 @@ def run_pipeline(models, image_path):
         "eyebrow_length_right": brow_meas["right"]["eyebrow_length"],
         "eyebrow_tilt_right": brow_meas["right"]["eyebrow_tilt"],
         "nasal_tip_angle": angles["nasal_tip_angle"],
+        "facial_index": facial_idx["facial_index"],
+        "facial_height": facial_idx["facial_height"],
+        "facial_width": facial_idx["facial_width"],
+        "naso_intercanthal_ratio": width_ratios["naso_intercanthal_ratio"],
+        "fissure_biocular_ratio": width_ratios["fissure_biocular_ratio"],
+        "mouth_biocular_ratio": width_ratios["mouth_biocular_ratio"],
+        "fissure_asymmetry": asymmetry["fissure_asymmetry"],
+        "eyebrow_length_asymmetry": asymmetry["eyebrow_length_asymmetry"],
         "nose_width": nose_shape["nose_width"],
         "nose_length": nose_shape["nose_length"],
         "nose_area": nose_shape["nose_area"],

@@ -30,6 +30,16 @@ BROW_ENDS = {
     "left": {"medial": 22, "lateral": 26},
 }
 
+# Face-contour landmarks (iBUG/300W) for the global facial index. The 68 set
+# has no true zygion; contour points 2 and 14 sit at cheekbone level and
+# approximate the bizygomatic breadth. Verified on the mean shape: they land in
+# the anthropometric facial-index range, unlike the ear-level extremes 0/16,
+# which give a bitemporal width instead. Gnathion is the lowest midline chin
+# point (index 8), also used as the chin apex elsewhere.
+GNATHION = 8
+ZYGION_RIGHT = 2   # subject's right cheek contour (x<0)
+ZYGION_LEFT = 14   # subject's left cheek contour (x>0)
+
 
 def _hull_area_volume(points):
     # A convex hull needs at least 4 points; an empty or tiny mask (e.g. an
@@ -311,4 +321,80 @@ def eye_dimensions(canonical_shape, vertex_labels, label2id, side):
     return {
         "eye_area": area,
         "eye_volume": volume,
+    }
+
+
+def facial_index(v3d, ldm68_vertex_idx):
+    """
+    Facial (prosopic) index = (facial height / facial width) * 100, a global
+    face proportion from exact 68 landmarks. Both are euclidean distances, so
+    pose-independent like the nasal index.
+
+      - facial height: nasion(27) to gnathion(8), midline points.
+      - facial width:  cheek-level contour points (2, 14), a proxy for the
+        bizygomatic breadth since the 68 set has no true zygion.
+
+    Reported as a bare number: the width is a proxy, so the classic prosopic
+    categories (leptoprosopic/euryprosopic) are not applied here.
+    """
+    landmarks = v3d[ldm68_vertex_idx]
+    facial_height = np.linalg.norm(landmarks[NASION] - landmarks[GNATHION])
+    facial_width = np.linalg.norm(landmarks[ZYGION_LEFT] - landmarks[ZYGION_RIGHT])
+    fi = (facial_height / facial_width) * 100
+
+    return {
+        "facial_height": float(facial_height),
+        "facial_width": float(facial_width),
+        "facial_index": float(fi),
+    }
+
+
+def facial_width_ratios(v3d, ldm68_vertex_idx):
+    """
+    Dimensionless width ratios from exact 68 landmarks, all euclidean-distance
+    ratios (pose-independent, scale-free). The biocular width (exocanthion to
+    exocanthion) is the common reference.
+
+      - naso_intercanthal_ratio: nasal (alar) width / intercanthal width. A
+        recognised facial-analysis proportion (the "rule of fifths": alar base
+        approximately equal to the intercanthal distance).
+      - fissure_biocular_ratio:  mean palpebral fissure length / biocular width.
+      - mouth_biocular_ratio:    mouth width / biocular width.
+    """
+    lm = v3d[ldm68_vertex_idx]
+    biocular = np.linalg.norm(lm[EYE_CORNERS["left"]["outer"]] - lm[EYE_CORNERS["right"]["outer"]])
+    intercanthal = np.linalg.norm(lm[EYE_CORNERS["right"]["inner"]] - lm[EYE_CORNERS["left"]["inner"]])
+    fissure_r = np.linalg.norm(lm[EYE_CORNERS["right"]["inner"]] - lm[EYE_CORNERS["right"]["outer"]])
+    fissure_l = np.linalg.norm(lm[EYE_CORNERS["left"]["inner"]] - lm[EYE_CORNERS["left"]["outer"]])
+    nasal_width = np.linalg.norm(lm[ALA_LEFT] - lm[ALA_RIGHT])
+    mouth_width = np.linalg.norm(lm[CHEILION_LEFT] - lm[CHEILION_RIGHT])
+
+    return {
+        "naso_intercanthal_ratio": float(nasal_width / intercanthal),
+        "fissure_biocular_ratio": float(0.5 * (fissure_r + fissure_l) / biocular),
+        "mouth_biocular_ratio": float(mouth_width / biocular),
+    }
+
+
+def facial_asymmetry(v3d, canonical_shape, ldm68_vertex_idx):
+    """
+    Left/right asymmetry indices from the paired measures, as |L-R|/(L+R).
+    Fissure length is a pose-independent distance (measured on v3d); eyebrow
+    length is measured on the canonical shape, consistent with the eyebrow
+    measures. Both dimensionless.
+    """
+    lm = v3d[ldm68_vertex_idx]
+    fissure_r = np.linalg.norm(lm[EYE_CORNERS["right"]["inner"]] - lm[EYE_CORNERS["right"]["outer"]])
+    fissure_l = np.linalg.norm(lm[EYE_CORNERS["left"]["inner"]] - lm[EYE_CORNERS["left"]["outer"]])
+
+    cn = canonical_shape[ldm68_vertex_idx]
+    brow_r = np.linalg.norm(cn[BROW_ENDS["right"]["lateral"]] - cn[BROW_ENDS["right"]["medial"]])
+    brow_l = np.linalg.norm(cn[BROW_ENDS["left"]["lateral"]] - cn[BROW_ENDS["left"]["medial"]])
+
+    def rel(a, b):
+        return float(abs(a - b) / (a + b)) if (a + b) > 0 else float("nan")
+
+    return {
+        "fissure_asymmetry": rel(fissure_l, fissure_r),
+        "eyebrow_length_asymmetry": rel(brow_l, brow_r),
     }

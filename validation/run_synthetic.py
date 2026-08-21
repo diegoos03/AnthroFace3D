@@ -25,7 +25,11 @@ SIGMA_FRAC = 0.6
 N_SAMPLES = 40
 SEED = 0
 
-MEASURES = ["nasal_index", "mouth_nose_ratio", "canthal_index", "nasal_tip_angle", "eyebrow_tilt"]
+MEASURES = [
+    "nasal_index", "mouth_nose_ratio", "canthal_index", "nasal_tip_angle", "eyebrow_tilt",
+    "facial_index", "naso_intercanthal_ratio", "fissure_biocular_ratio", "mouth_biocular_ratio",
+    "fissure_asymmetry", "eyebrow_length_asymmetry",
+]
 
 
 def run(image_path="examples/foto_5.jpg", n_samples=N_SAMPLES, sigma_frac=SIGMA_FRAC, seed=SEED):

@@ -7,6 +7,9 @@ from core.measurements import (
     intercanthal_biocular,
     facial_angles,
     eyebrow_measures,
+    facial_index,
+    facial_width_ratios,
+    facial_asymmetry,
 )
 
 # The dimensionless primary measures validated by the synthetic round-trip.
@@ -19,12 +22,20 @@ def dimensionless_measures(v3d_np, canonical_np, ldm68_idx):
         eyebrow_measures(canonical_np, ldm68_idx, "left")["eyebrow_tilt"]
         + eyebrow_measures(canonical_np, ldm68_idx, "right")["eyebrow_tilt"]
     )
+    ratios = facial_width_ratios(v3d_np, ldm68_idx)
+    asymmetry = facial_asymmetry(v3d_np, canonical_np, ldm68_idx)
     return {
         "nasal_index": nasal_index(v3d_np, ldm68_idx)["nasal_index"],
         "mouth_nose_ratio": mouth_measures(v3d_np, ldm68_idx)["mouth_nose_ratio"],
         "canthal_index": intercanthal_biocular(v3d_np, ldm68_idx)["canthal_index"],
         "nasal_tip_angle": facial_angles(v3d_np, ldm68_idx)["nasal_tip_angle"],
         "eyebrow_tilt": brow_tilt,
+        "facial_index": facial_index(v3d_np, ldm68_idx)["facial_index"],
+        "naso_intercanthal_ratio": ratios["naso_intercanthal_ratio"],
+        "fissure_biocular_ratio": ratios["fissure_biocular_ratio"],
+        "mouth_biocular_ratio": ratios["mouth_biocular_ratio"],
+        "fissure_asymmetry": asymmetry["fissure_asymmetry"],
+        "eyebrow_length_asymmetry": asymmetry["eyebrow_length_asymmetry"],
     }
 
 
