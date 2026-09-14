@@ -34,8 +34,13 @@ external/util/cython_renderer/*.so
 
 .codex
 
+# Notas de planificación del TFG (privado, no publicar)
+planning/
 
 # Fotos de prueba (personas particulares, no publicables)
 examples/*.jpg
 examples/*.jpeg
 examples/*.png
+
+# Resultados de validación derivados de datasets de caras reales
+e3_pose_per_image.csv

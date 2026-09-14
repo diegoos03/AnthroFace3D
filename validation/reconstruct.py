@@ -16,16 +16,33 @@ from core.constants import label2id, symmetric_translate
 from core.postprocess import merge_eyeglasses_labels, clean_labels_with_connectivity
 
 
-def reconstruct_from_image(image_path):
-    """
-    Run the same image -> reconstruction + segmentation pipeline as main.py,
-    returning the arrays the validation experiments need. Calls the same core
-    functions in the same order, so it stays faithful to the production path.
-    """
+def load_reconstruction_models():
+    """Load every model once, to reuse across many reconstruct_from_image() calls."""
     device = get_device()
     config = ModelConfig(device=device)
     recon_model, face_detector = load_3ddfa_models(config)
     seg_processor, seg_model = load_segformer_models(device)
+    return {
+        "device": device,
+        "config": config,
+        "recon_model": recon_model,
+        "face_detector": face_detector,
+        "seg_processor": seg_processor,
+        "seg_model": seg_model,
+    }
+
+
+def reconstruct_from_image(image_path, models=None):
+    """Run the same reconstruction + segmentation pipeline as main.py. Pass
+    `models` from load_reconstruction_models() to reuse weights across images."""
+    if models is None:
+        models = load_reconstruction_models()
+    device = models["device"]
+    config = models["config"]
+    recon_model = models["recon_model"]
+    face_detector = models["face_detector"]
+    seg_processor = models["seg_processor"]
+    seg_model = models["seg_model"]
 
     image = load_and_crop_image(image_path, config)
     labels = run_segmentation(image, seg_processor, seg_model, device)

@@ -12,11 +12,8 @@ from core.measurements import (
     facial_asymmetry,
 )
 
-# The dimensionless primary measures validated by the synthetic round-trip.
-# All are scale-free (ratios or angles), so comparing the true value against
-# the recovered one is meaningful even though the 3DMM has no metric unit.
-# The first four are pose-invariant on the posed shape (v3d); the eyebrow tilt
-# is a frontal-plane angle, so it is measured on the canonical (unposed) shape.
+
+# All measures on the posed shape except eyebrow tilt (canonical, frontal plane).
 def dimensionless_measures(v3d_np, canonical_np, ldm68_idx):
     brow_tilt = 0.5 * (
         eyebrow_measures(canonical_np, ldm68_idx, "left")["eyebrow_tilt"]
@@ -40,11 +37,7 @@ def dimensionless_measures(v3d_np, canonical_np, ldm68_idx):
 
 
 def base_alpha_from_image(image, recon_model, face_detector, device):
-    """
-    Regress a real coefficient vector from an image, to use as a realistic
-    anchor: synthetic faces are sampled around it, so they stay in-distribution
-    (real albedo/lighting/pose, only the identity shape is varied).
-    """
+    """Regress a real coefficient vector from an image, used as the anchor."""
     _, im_tensor = face_detector(image)
     recon_model.input_img = im_tensor.to(device)
     with torch.no_grad():
@@ -53,32 +46,15 @@ def base_alpha_from_image(image, recon_model, face_detector, device):
 
 
 def sample_identity(alpha_base, sigma, generator):
-    """
-    Return a copy of alpha_base with its identity block (first 80 coeffs)
-    perturbed by Gaussian noise. Everything else (expression, albedo, lighting,
-    pose) is kept from the anchor, so only the face shape -- and thus the
-    measures -- varies.
-    """
+    """Perturb the identity block (first 80 coeffs) with Gaussian noise."""
     alpha = alpha_base.clone()
     noise = torch.randn(80, generator=generator, dtype=alpha.dtype) * sigma
     alpha[0, :80] = alpha[0, :80] + noise.to(alpha.device)
     return alpha
 
 
-def set_pose(alpha, pitch=0.0, yaw=0.0, roll=0.0):
-    """
-    Return a copy of alpha with its pose block (angles 224:227, in radians)
-    overwritten. Order is [pitch(x), yaw(y), roll(z)] per compute_rotation;
-    yaw is the left-right turn that drives self-occlusion.
-    """
-    alpha = alpha.clone()
-    alpha[0, 224:227] = torch.tensor([pitch, yaw, roll], dtype=alpha.dtype, device=alpha.device)
-    return alpha
-
-
 def _mesh_and_render(recon_model, alpha):
-    """Rebuild the mesh and its shaded render from a coefficient vector,
-    replicating the relevant steps of recon_model.forward()."""
+    """Rebuild the mesh and its shaded render from a coefficient vector."""
     d = recon_model.split_alpha(alpha)
     face_shape = recon_model.compute_shape(d["id"], d["exp"])
     rotation = recon_model.compute_rotation(d["angle"])
@@ -96,7 +72,7 @@ def _mesh_and_render(recon_model, alpha):
 
 
 def true_measures(recon_model, alpha, ldm68_idx):
-    """Measures computed directly on the known generated mesh (ground truth)."""
+    """Measures on the generated mesh (ground truth)."""
     with torch.no_grad():
         v3d, face_shape, _ = _mesh_and_render(recon_model, alpha)
     return dimensionless_measures(
@@ -105,13 +81,7 @@ def true_measures(recon_model, alpha, ldm68_idx):
 
 
 def recovered_measures(recon_model, alpha, ldm68_idx, device):
-    """
-    Render the generated mesh to an image, feed it back through the model
-    exactly as the pipeline would (net_recon -> mesh), and measure the result.
-    The render is already a 224x224 face in the model's frame, so face
-    detection and cropping are bypassed (no dependency on RetinaFace liking a
-    synthetic render).
-    """
+    """Render the mesh, feed it back through the model, and measure the result."""
     with torch.no_grad():
         _, _, render = _mesh_and_render(recon_model, alpha)
         recon_model.input_img = render.permute(2, 0, 1).unsqueeze(0).contiguous().to(device)
