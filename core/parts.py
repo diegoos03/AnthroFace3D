@@ -1,12 +1,5 @@
-# ==========================================
-# File: core/parts.py
-# ==========================================
-#
-# Registry of measured face parts. Each part bundles the 3D points that
-# belong to it, its computed measurements, and any reference landmarks —
-# everything the viewer needs to give it its own isolated 3D view. Adding a
-# new measured part means adding one function here; the viewer picks it up
-# without changes.
+# Registry of measured face parts: each bundles its points, measurements and
+# reference landmarks for the viewer's isolated 3D view. One function per part.
 
 from dataclasses import dataclass, field
 
@@ -47,8 +40,7 @@ def nose_part(canonical_shape, vertex_labels, label2id, nasal_measurements, nose
         }
 
     # Primary: the dimensionless index and its landmark-based inputs (stable,
-    # pose-invariant). The raw widths carry no metric unit, so they only make
-    # sense as the ingredients of the index, not as standalone measurements.
+    # pose-invariant); the raw widths are only the ingredients of the index.
     measurements = {
         "Nasal Index": f"{nasal_measurements['nasal_index']:.2f} ({nasal_measurements['category']})",
         "Nasal width (landmarks)": f"{nasal_measurements['nasal_width']:.3f}",

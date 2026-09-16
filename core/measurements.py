@@ -8,9 +8,7 @@ SUBNASALE = 33
 ALA_LEFT = 31
 ALA_RIGHT = 35
 
-# Mouth landmarks (iBUG/300W). Cheilia (mouth corners) verified empirically on
-# the canonical shape: 48 = subject's right corner (x<0), 54 = left (x>0);
-# they are the most lateral outer-lip points, so they are the true cheilia.
+# Mouth landmarks (iBUG/300W): cheilia 48 (subject's right, x<0), 54 (left, x>0).
 CHEILION_RIGHT = 48
 CHEILION_LEFT = 54
 LABIALE_SUPERIUS = 51
@@ -30,24 +28,16 @@ BROW_ENDS = {
     "left": {"medial": 22, "lateral": 26},
 }
 
-# Face-contour landmarks (iBUG/300W) for the global facial index. The 68 set
-# has no true zygion; contour points 2 and 14 sit at cheekbone level and
-# approximate the bizygomatic breadth. Verified on the mean shape: they land in
-# the anthropometric facial-index range, unlike the ear-level extremes 0/16,
-# which give a bitemporal width instead. Gnathion is the lowest midline chin
-# point (index 8), also used as the chin apex elsewhere.
+# Face-contour landmarks (iBUG/300W) for the facial index: contour points 2/14
+# approximate the bizygomatic breadth (no true zygion in the 68 set), gnathion 8.
 GNATHION = 8
 ZYGION_RIGHT = 2   # subject's right cheek contour (x<0)
 ZYGION_LEFT = 14   # subject's left cheek contour (x>0)
 
 
 def _hull_area_volume(points):
-    # A convex hull needs at least 4 points; an empty or tiny mask (e.g. an
-    # occluded part, or an eye hidden behind glasses on a different photo) has
-    # no hull, so we report NaN rather than crashing. Near-planar masks (e.g.
-    # eyes) can still make Qhull reject the flat initial simplex; QJ joggles
-    # the input just enough to build a hull, at the cost of a negligible
-    # perturbation (volume stays ~0 for a flat patch anyway).
+    # A convex hull needs >=4 points; empty or near-planar masks return NaN
+    # (QJ joggles near-planar input so Qhull doesn't reject the flat simplex).
     if len(points) < 4:
         return float("nan"), float("nan")
     try:
@@ -61,15 +51,8 @@ def _hull_area_volume(points):
 
 
 def nasal_index(v3d, ldm68_vertex_idx):
-    """
-    Nasal Index (NI) = (nasal width / nasal height) * 100, computed on the
-    3D mesh so it is pose-independent. Classification thresholds from the
-    standard anthropometric convention (Leptorrhine/Mesorrhine/Platyrrhine).
-
-    Parameters:
-        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
-        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-    """
+    """Nasal Index = (nasal width / nasal height) * 100 on the 3D mesh
+    (pose-independent), classified as leptorrhine/mesorrhine/platyrrhine."""
     landmarks = v3d[ldm68_vertex_idx]
 
     nasal_width = np.linalg.norm(landmarks[ALA_LEFT] - landmarks[ALA_RIGHT])
@@ -92,17 +75,8 @@ def nasal_index(v3d, ldm68_vertex_idx):
 
 
 def nose_dimensions(canonical_shape, vertex_labels, label2id):
-    """
-    Nose width, length, and convex-hull area/volume, computed from the
-    segmentation-labeled canonical (unposed) 3D shape. Width/length are
-    axis-aligned, so this requires the unrotated canonical space rather
-    than the posed/projected one.
-
-    Parameters:
-        canonical_shape -- np.ndarray, size (N, 3), unposed mesh vertices
-        vertex_labels    -- np.ndarray, size (N,), per-vertex segmentation labels
-        label2id          -- dict, segmentation label name -> id
-    """
+    """Nose width/length and hull area/volume from the segmentation mask, on the
+    canonical (unposed) shape (width/length are axis-aligned)."""
     nose_points = canonical_shape[vertex_labels == label2id["nose"]]
     if len(nose_points) == 0:
         nan = float("nan")
@@ -124,16 +98,8 @@ def nose_dimensions(canonical_shape, vertex_labels, label2id):
 
 
 def palpebral_fissure_length(v3d, ldm68_vertex_idx, side):
-    """
-    Palpebral fissure length (eye width) = 3D distance between the inner
-    (endocanthion) and outer (exocanthion) corner of one eye. A euclidean
-    distance between two landmarks, so pose-independent like the nasal index.
-
-    Parameters:
-        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
-        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-        side               -- "left" or "right" (subject's own side)
-    """
+    """Palpebral fissure length (eye width): 3D endocanthion-to-exocanthion
+    distance for one eye, pose-independent."""
     landmarks = v3d[ldm68_vertex_idx]
     corners = EYE_CORNERS[side]
     length = np.linalg.norm(landmarks[corners["inner"]] - landmarks[corners["outer"]])
@@ -141,15 +107,9 @@ def palpebral_fissure_length(v3d, ldm68_vertex_idx, side):
 
 
 def intercanthal_biocular(v3d, ldm68_vertex_idx):
-    """
-    Bilateral horizontal eye measures from the 68 landmarks:
-      - intercanthal width: endocanthion to endocanthion (inner corners)
-      - biocular width: exocanthion to exocanthion (outer corners)
-      - canthal index: (intercanthal / biocular) * 100
-    All euclidean 3D distances, pose-independent. The canthal index is
-    reported as a bare number: unlike the nasal index it has no established
-    classification thresholds anchored in this project's references.
-    """
+    """Bilateral eye measures from the 68 landmarks: intercanthal (inner-inner)
+    and biocular (outer-outer) widths, canthal index = intercanthal/biocular*100
+    (a bare number, no anchored thresholds). All pose-independent."""
     landmarks = v3d[ldm68_vertex_idx]
     endocanthion_r = landmarks[EYE_CORNERS["right"]["inner"]]
     endocanthion_l = landmarks[EYE_CORNERS["left"]["inner"]]
@@ -168,18 +128,8 @@ def intercanthal_biocular(v3d, ldm68_vertex_idx):
 
 
 def mouth_measures(v3d, ldm68_vertex_idx):
-    """
-    Mouth width and the dimensionless mouth/nose width ratio, both from exact
-    68 landmarks:
-      - mouth_width: cheilion-to-cheilion 3D distance (mouth corners).
-      - mouth_nose_ratio: mouth width / nasal (alar) width.
-    Both are euclidean distances between two landmarks, so pose-independent;
-    the ratio is scale-free and comparable across faces, like the nasal index.
-
-    Parameters:
-        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
-        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-    """
+    """Mouth width (cheilion-to-cheilion) and the dimensionless mouth/nose width
+    ratio, from exact 68 landmarks (pose-independent, scale-free)."""
     landmarks = v3d[ldm68_vertex_idx]
     m_width = np.linalg.norm(landmarks[CHEILION_LEFT] - landmarks[CHEILION_RIGHT])
     n_width = np.linalg.norm(landmarks[ALA_LEFT] - landmarks[ALA_RIGHT])
@@ -191,11 +141,8 @@ def mouth_measures(v3d, ldm68_vertex_idx):
 
 
 def mouth_dimensions(canonical_shape, vertex_labels, label2id):
-    """
-    Convex-hull area/volume of the lip region (upper lip + lower lip + inner
-    mouth masks), on the canonical (unposed) shape. Secondary segmentation
-    signal, analogous to nose/eye area/volume.
-    """
+    """Convex-hull area/volume of the lip region (u_lip+l_lip+mouth) on the
+    canonical shape. Secondary segmentation signal."""
     lip_ids = [label2id["u_lip"], label2id["l_lip"], label2id["mouth"]]
     mouth_points = canonical_shape[np.isin(vertex_labels, lip_ids)]
     area, volume = _hull_area_volume(mouth_points)
@@ -207,11 +154,8 @@ def mouth_dimensions(canonical_shape, vertex_labels, label2id):
 
 
 def _angle_at(vertex, a, b):
-    """
-    Angle in degrees at `vertex`, subtended by points a and b. Being an angle
-    between two directions, it is invariant to rotation, translation and
-    uniform scale -- so it needs no metric unit, unlike a raw distance.
-    """
+    """Angle in degrees at `vertex` between points a and b; invariant to
+    rotation, translation and scale."""
     va = a - vertex
     vb = b - vertex
     cos = np.dot(va, vb) / (np.linalg.norm(va) * np.linalg.norm(vb))
@@ -226,22 +170,9 @@ def _acute_vector_angle(v1, v2):
 
 
 def eyebrow_measures(canonical_shape, ldm68_vertex_idx, side):
-    """
-    Per-eyebrow measures from exact 68 landmarks, on the canonical (unposed)
-    shape so they are pose-invariant:
-      - eyebrow_length: 3D chord distance medial-to-lateral brow endpoint.
-      - eyebrow_tilt: acute angle (degrees) between the brow chord and the
-        biocular axis (exocanthion-to-exocanthion), measured in the FRONTAL
-        (x, y) plane only. The frontal projection is deliberate: the full-3D
-        brow chord wraps backward toward the temple (large z), which would
-        conflate that temporal wrap with the up/down slant that "tilt" means.
-        Working in the canonical frame keeps the frontal angle pose-invariant.
-
-    Parameters:
-        canonical_shape   -- np.ndarray, size (N, 3), unposed mesh vertices
-        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-        side               -- "left" or "right" (subject's own side)
-    """
+    """Per-eyebrow length (3D medial-to-lateral chord) and tilt (acute angle to
+    the biocular axis, in the frontal x,y plane to avoid the temporal z-wrap),
+    on the canonical shape so they are pose-invariant."""
     landmarks = canonical_shape[ldm68_vertex_idx]
     ends = BROW_ENDS[side]
     brow_chord = landmarks[ends["lateral"]] - landmarks[ends["medial"]]
@@ -254,14 +185,8 @@ def eyebrow_measures(canonical_shape, ldm68_vertex_idx, side):
 
 
 def eyebrow_dimensions(canonical_shape, vertex_labels, label2id, side):
-    """
-    Convex-hull area/volume of one eyebrow's segmentation mask, on the
-    canonical (unposed) shape. Secondary signal, analogous to eye area/volume.
-
-    Parameters:
-        side -- "left" or "right" (subject's own side); maps to the
-                 'l_brow'/'r_brow' segmentation labels.
-    """
+    """Convex-hull area/volume of one eyebrow's mask on the canonical shape;
+    side maps to 'l_brow'/'r_brow'. Secondary signal."""
     label_key = "l_brow" if side == "left" else "r_brow"
     brow_points = canonical_shape[vertex_labels == label2id[label_key]]
     area, volume = _hull_area_volume(brow_points)
@@ -273,28 +198,9 @@ def eyebrow_dimensions(canonical_shape, vertex_labels, label2id, side):
 
 
 def facial_angles(v3d, ldm68_vertex_idx):
-    """
-    Dimensionless, pose-invariant profile angles from the 68 midline
-    landmarks -- an ideal descriptor family given the 3DMM carries no absolute
-    scale. Only angles whose three landmarks are exact are reported: no proxies.
-
-    Currently that is a single angle:
-      - nasal_tip_angle: nasion-pronasale-subnasale, all exact midline points.
-
-    Other classic profile angles are deliberately NOT computed here, because
-    the 68/106/134 landmark sets (all the same face-alignment family) lack the
-    points they require and would force approximations:
-      - nasolabial angle needs a columella-apex point (absent in every set;
-        the 106 nostril-base points sit at subnasale depth, so proxying gives
-        a near-straight, meaningless angle).
-      - nasomental / facial convexity need pogonion and glabella; the sets have
-        neither (menton/nasion are not those points, and no set has forehead
-        landmarks). Getting those is the cephalometric-refinement route.
-
-    Parameters:
-        v3d               -- np.ndarray, size (N, 3), reconstructed mesh vertices
-        ldm68_vertex_idx   -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-    """
+    """Dimensionless, pose-invariant profile angles from exact 68 midline
+    landmarks. Only nasal_tip_angle (nasion-pronasale-subnasale) is exact; other
+    classic angles need points absent from the sets and are not approximated."""
     landmarks = v3d[ldm68_vertex_idx]
     nasion = landmarks[NASION]
     pronasale = landmarks[PRONASALE]
@@ -306,14 +212,8 @@ def facial_angles(v3d, ldm68_vertex_idx):
 
 
 def eye_dimensions(canonical_shape, vertex_labels, label2id, side):
-    """
-    Convex-hull area/volume of one eye's segmentation mask, on the canonical
-    (unposed) shape. Secondary signal, analogous to nose area/volume.
-
-    Parameters:
-        side -- "left" or "right" (subject's own side); maps to the
-                 'l_eye'/'r_eye' segmentation labels.
-    """
+    """Convex-hull area/volume of one eye's mask on the canonical shape; side
+    maps to 'l_eye'/'r_eye'. Secondary signal."""
     label_key = "l_eye" if side == "left" else "r_eye"
     eye_points = canonical_shape[vertex_labels == label2id[label_key]]
     area, volume = _hull_area_volume(eye_points)
@@ -325,18 +225,9 @@ def eye_dimensions(canonical_shape, vertex_labels, label2id, side):
 
 
 def facial_index(v3d, ldm68_vertex_idx):
-    """
-    Facial (prosopic) index = (facial height / facial width) * 100, a global
-    face proportion from exact 68 landmarks. Both are euclidean distances, so
-    pose-independent like the nasal index.
-
-      - facial height: nasion(27) to gnathion(8), midline points.
-      - facial width:  cheek-level contour points (2, 14), a proxy for the
-        bizygomatic breadth since the 68 set has no true zygion.
-
-    Reported as a bare number: the width is a proxy, so the classic prosopic
-    categories (leptoprosopic/euryprosopic) are not applied here.
-    """
+    """Facial (prosopic) index = (facial height / facial width) * 100 from exact
+    68 landmarks (nasion-gnathion over cheek-contour 2/14 as bizygomatic proxy);
+    pose-independent, reported as a bare number since the width is a proxy."""
     landmarks = v3d[ldm68_vertex_idx]
     facial_height = np.linalg.norm(landmarks[NASION] - landmarks[GNATHION])
     facial_width = np.linalg.norm(landmarks[ZYGION_LEFT] - landmarks[ZYGION_RIGHT])
@@ -350,17 +241,9 @@ def facial_index(v3d, ldm68_vertex_idx):
 
 
 def facial_width_ratios(v3d, ldm68_vertex_idx):
-    """
-    Dimensionless width ratios from exact 68 landmarks, all euclidean-distance
-    ratios (pose-independent, scale-free). The biocular width (exocanthion to
-    exocanthion) is the common reference.
-
-      - naso_intercanthal_ratio: nasal (alar) width / intercanthal width. A
-        recognised facial-analysis proportion (the "rule of fifths": alar base
-        approximately equal to the intercanthal distance).
-      - fissure_biocular_ratio:  mean palpebral fissure length / biocular width.
-      - mouth_biocular_ratio:    mouth width / biocular width.
-    """
+    """Dimensionless width ratios from exact 68 landmarks (pose-independent),
+    all over the biocular width: naso_intercanthal (alar/intercanthal, the
+    "rule of fifths"), fissure_biocular and mouth_biocular."""
     lm = v3d[ldm68_vertex_idx]
     biocular = np.linalg.norm(lm[EYE_CORNERS["left"]["outer"]] - lm[EYE_CORNERS["right"]["outer"]])
     intercanthal = np.linalg.norm(lm[EYE_CORNERS["right"]["inner"]] - lm[EYE_CORNERS["left"]["inner"]])
@@ -377,12 +260,8 @@ def facial_width_ratios(v3d, ldm68_vertex_idx):
 
 
 def facial_asymmetry(v3d, canonical_shape, ldm68_vertex_idx):
-    """
-    Left/right asymmetry indices from the paired measures, as |L-R|/(L+R).
-    Fissure length is a pose-independent distance (measured on v3d); eyebrow
-    length is measured on the canonical shape, consistent with the eyebrow
-    measures. Both dimensionless.
-    """
+    """Left/right asymmetry as |L-R|/(L+R) for fissure length (on v3d) and
+    eyebrow length (on the canonical shape). Dimensionless."""
     lm = v3d[ldm68_vertex_idx]
     fissure_r = np.linalg.norm(lm[EYE_CORNERS["right"]["inner"]] - lm[EYE_CORNERS["right"]["outer"]])
     fissure_l = np.linalg.norm(lm[EYE_CORNERS["left"]["inner"]] - lm[EYE_CORNERS["left"]["outer"]])

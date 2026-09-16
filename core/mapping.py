@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/mapping.py
-# ==========================================
-
 import numpy as np
 from scipy.interpolate import NearestNDInterpolator
 
@@ -20,17 +16,13 @@ def map_segmentation_to_mesh(labels, face_proj_original):
 
     interpolator = NearestNDInterpolator(points, values)
 
-    # Projected pixel coords: coord[0] = column (x), coord[1] = row (y). One
-    # vectorized query over all vertices at once, instead of a Python loop over
-    # ~35k of them.
+    # Projected pixel coords (col=x, row=y), queried in one vectorized call.
     cols = face_proj_original[:, 0]
     rows = face_proj_original[:, 1]
     v2d_label = np.asarray(interpolator(rows, cols))
 
-    # Vertices whose projection lands outside the image have no valid pixel;
-    # nearest-neighbour would otherwise paste a border label onto them, so we
-    # mark them background instead. Matters for non-frontal faces, where
-    # back-facing vertices project off-frame.
+    # Vertices projecting outside the image get background, not a pasted border
+    # label (matters for non-frontal faces with off-frame back-facing vertices).
     out_of_bounds = (
         (cols < 0) | (cols >= labels.shape[1]) |
         (rows < 0) | (rows >= labels.shape[0])

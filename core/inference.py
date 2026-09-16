@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/inference.py
-# ==========================================
-
 import torch
 from external.util.preprocess import back_resize_ldms
 
@@ -31,7 +27,7 @@ def project_to_original_image(results, recon_model, trans_params):
     face_proj = v3d @ persc_proj
     face_proj = face_proj[..., :2] / face_proj[..., 2:]
 
-    # flip eje Y
+    # flip Y axis
     face_proj[:, :, 1] = 224 - 1 - face_proj[:, :, 1]
 
     # original size

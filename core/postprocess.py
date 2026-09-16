@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/postprocess.py
-# ==========================================
-
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.sparse import csr_matrix
@@ -11,22 +7,9 @@ from core.measurements import EYE_CORNERS
 
 
 def merge_eyeglasses_labels(points, labels, label2id, ldm68_vertex_idx):
-    """
-    Fold the eyeglasses mask (eye_g) into the eyes so glasses never block the
-    per-eye measures. Each eye_g vertex within ~1.2x the palpebral-fissure
-    length of an eye-corner landmark is reassigned to the nearer eye
-    (l_eye/r_eye); the rest (frame bridge, temple arms) becomes skin. Without
-    this a subject wearing glasses leaves l_eye/r_eye nearly empty, degrading
-    the secondary eye area/volume signal -- the landmark-based eye measures
-    (fissure, intercanthal, biocular) never touch the mask, so they are
-    unaffected. Operates on the canonical (unposed) shape.
-
-    Parameters:
-        points             -- np.ndarray, size (N, 3), canonical (unposed) vertices
-        labels              -- np.ndarray, size (N,), per-vertex segmentation labels
-        label2id            -- dict, segmentation label name -> id
-        ldm68_vertex_idx    -- np.ndarray, size (68,), vertex indices for the 68 landmarks
-    """
+    """Fold the eyeglasses mask (eye_g) into the nearer eye when within ~1.2x the
+    palpebral-fissure length of an eye corner, the rest to skin, so glasses don't
+    blank the eye region. Runs on the canonical (unposed) shape."""
     labels = labels.copy().astype(int)
 
     mask = labels == label2id["eye_g"]

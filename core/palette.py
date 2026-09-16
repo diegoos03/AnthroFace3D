@@ -1,10 +1,5 @@
-# ==========================================
-# File: core/palette.py
-# ==========================================
-
-# Validated 8-slot categorical palette (dataviz skill, references/palette.md).
-# Fixed order, checked as a set for all-pairs CVD separation — do not reassign
-# individual hex values or cycle beyond 8 slots.
+# 8-slot categorical palette, fixed order and colourblind-safe as a set: do not
+# reassign individual hex values or cycle beyond 8 slots.
 CATEGORICAL = [
     "#2a78d6",  # blue
     "#1baf7a",  # aqua
@@ -37,9 +32,8 @@ CONTEXT_COLOR = "#898781"
 # distinct from the categorical slots so it never impersonates a measured part.
 LANDMARK_ACCENT = "#d03b3b"
 
-# Generic accent for previews that aren't tied to one specific part (e.g. the
-# full back-projected point cloud, or all 68 landmarks at once) — kept out of
-# PART_COLORS so it never gets mistaken for a specific part's identity color.
+# Generic accent for previews not tied to one part (full point cloud, all 68
+# landmarks); kept out of PART_COLORS so it isn't read as a part's own color.
 GENERIC_ACCENT = "#256abf"
 
 INK = {

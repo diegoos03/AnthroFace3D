@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/preprocess.py
-# ==========================================
-
 from external.ffhq_crop import FFHQCrop
 from PIL import Image
 

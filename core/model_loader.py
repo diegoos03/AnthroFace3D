@@ -1,43 +1,21 @@
-# ==========================================
-# File: core/model_loader.py
-# ==========================================
 import torch
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
 
-# Import 3DDFA_v3
 from external.face_box import face_box
 from external.model.recon import face_model
 
-# Import config
 from core.config import ModelConfig
 
 
-# -----------------------------
-# Device
-# -----------------------------
-
-# Note: GPU-related issues because of Python version, we default to CPU.
-#   def get_device():
-#        """Detect and return available hardware (GPU or CPU)."""
-#        device = "cuda" if torch.cuda.is_available() else "cpu"
-#        print(f"[*] Device initialized: {device}")
-#        return device
-
+# GPU disabled by design (Python-version incompatibility), CPU only.
 def get_device():
     device = "cpu"
     print(f"[*] Device initialized: {device}")
     return device
 
 
-# -----------------------------
-# 3DDFA Loader
-# -----------------------------
 def load_3ddfa_models(config: ModelConfig):
-    """
-    Load geometric models:
-    - Face detector (RetinaFace)
-    - 3D face reconstruction model (ResNet50 backbone)
-    """
+    """Load the face detector (RetinaFace) and the 3D reconstruction model."""
     print("[*] Loading geometric models (3DDFA-V3)...")
 
     recon_model = face_model(config)
@@ -46,17 +24,11 @@ def load_3ddfa_models(config: ModelConfig):
     return recon_model, facebox_detector
 
 
-# -----------------------------
-# SegFormer Loader (with cache)
-# -----------------------------
 _segformer_cache = None
 
 
 def load_segformer_models(device):
-    """
-    Load semantic segmentation model (SegFormer).
-    Uses caching to avoid reloading weights multiple times.
-    """
+    """Load the SegFormer segmentation model, cached to avoid reloading weights."""
     global _segformer_cache
 
     if _segformer_cache is not None:

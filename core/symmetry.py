@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/symmetry.py
-# ==========================================
-
 import numpy as np
 from scipy.interpolate import NearestNDInterpolator
 from scipy.spatial import cKDTree

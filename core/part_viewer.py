@@ -1,7 +1,3 @@
-# ==========================================
-# File: core/part_viewer.py
-# ==========================================
-
 import tempfile
 import webbrowser
 
