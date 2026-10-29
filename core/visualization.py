@@ -8,7 +8,8 @@ import webbrowser
 import numpy as np
 
 from core.segmentation import visualize_segmentation
-from core.palette import INK, PART_COLORS, CONTEXT_COLOR, GENERIC_ACCENT
+from core.palette import INK, PART_COLORS, CONTEXT_COLOR, GENERIC_ACCENT, LANDMARK_ACCENT
+from core.measurements import LANDMARK_NAMES, landmark_descriptors
 from core.part_viewer import open_part_in_browser
 
 
@@ -29,25 +30,40 @@ def _to_uint8_image(image_like):
     return (image * 255).astype(np.uint8)
 
 
+def _hex_to_rgb(hex_color):
+    hex_digits = hex_color.lstrip("#")
+    return np.array([int(hex_digits[i:i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8)
+
+
+def _mat_render(render, threshold=10):
+    """Replace the renderer's black backdrop with the panel background, so the
+    rendered face sits on the page like the photographic panels do."""
+    matted = render.copy()
+    backdrop = (matted <= threshold).all(axis=-1)
+    matted[backdrop] = _hex_to_rgb(INK["surface"])
+    return matted
+
+
 def _plot_sampled_points(ax, image, points, max_points=2000):
     ax.imshow(image)
     if points is not None and len(points) > 0:
         stride = max(1, len(points) // max_points)
         sampled = points[::stride]
-        ax.scatter(sampled[:, 0], sampled[:, 1], s=1, c=GENERIC_ACCENT, alpha=0.55)
+        ax.scatter(sampled[:, 0], sampled[:, 1], s=2.4, c=GENERIC_ACCENT, alpha=0.4, linewidths=0)
     ax.axis("off")
 
 
 def _style_panel_title(ax, text):
-    ax.set_title(text, fontsize=12, color=INK["secondary"], fontweight="medium", pad=8)
+    ax.set_title(text, fontsize=11, color=INK["secondary"], pad=6)
 
 
-def create_results_figure(image, labels, results, points):
-    render_face = _to_uint8_image(results["render_face"][0])
-    render_shape = _to_uint8_image(results["render_shape"][0])
+def create_results_figure(image, labels, results, points, ldm68_idx=None):
+    render_face = _mat_render(_to_uint8_image(results["render_face"][0]))
+    render_shape = _mat_render(_to_uint8_image(results["render_shape"][0]))
     seg_overlay = visualize_segmentation(image, labels)
 
-    fig = Figure(figsize=(16, 10), dpi=100, facecolor=INK["surface"])
+    fig = Figure(figsize=(15, 10.2), dpi=100, facecolor=INK["surface"], layout="constrained")
+    fig.get_layout_engine().set(w_pad=0.03, h_pad=0.03, wspace=0.01, hspace=0.02)
     axes = fig.subplots(2, 3).ravel()
 
     axes[0].imshow(image)
@@ -69,10 +85,19 @@ def create_results_figure(image, labels, results, points):
     _plot_sampled_points(axes[4], image, points)
     _style_panel_title(axes[4], "3D Back Projection")
 
-    if "ldm68" in results:
+    if ldm68_idx is not None:
         axes[5].imshow(image)
-        landmarks = results["ldm68"][0]
-        axes[5].scatter(landmarks[:, 0], 223 - landmarks[:, 1], s=10, c=GENERIC_ACCENT)
+        # results["ldm68"] lives in the model's 224 frame, while `points` holds
+        # the same vertices already mapped onto the crop, so the landmarks are
+        # the same indices taken from there.
+        landmarks = points[ldm68_idx]
+        axes[5].scatter(
+            landmarks[:, 0],
+            landmarks[:, 1],
+            s=14,
+            c=LANDMARK_ACCENT,
+            linewidths=0,
+        )
         _style_panel_title(axes[5], "68 Landmarks")
         axes[5].axis("off")
     else:
@@ -80,8 +105,7 @@ def create_results_figure(image, labels, results, points):
         _style_panel_title(axes[5], "Input Preview")
         axes[5].axis("off")
 
-    fig.suptitle("AnthroFace3D Results", fontsize=18, color=INK["primary"], fontweight="bold")
-    fig.tight_layout()
+    fig.suptitle("AnthroFace3D results", fontsize=17, color=INK["primary"], fontweight="semibold")
     return fig
 
 
@@ -206,9 +230,30 @@ def _embed_figure(parent, figure, with_toolbar=False):
     if with_toolbar:
         toolbar = NavigationToolbar2Tk(canvas, container, pack_toolbar=False)
         toolbar.update()
+        # The toolbar is a plain Tk widget, so it keeps its own grey unless the
+        # surface colour is pushed onto it and its children.
+        toolbar.configure(background=INK["surface"])
+        for child in toolbar.winfo_children():
+            try:
+                child.configure(background=INK["surface"])
+            except tk.TclError:
+                pass
         toolbar.pack(side="bottom", fill="x")
 
     return canvas
+
+
+# One family across the window and the figures, and four sizes instead of a
+# size picked per widget.
+TYPE_SCALE = {"display": 16, "value": 14, "title": 12, "body": 10}
+
+
+def _ui_family(root):
+    """DejaVu Sans matches the matplotlib panels; fall back to whatever Tk uses."""
+    from tkinter import font as tkfont
+
+    available = set(tkfont.families(root))
+    return "DejaVu Sans" if "DejaVu Sans" in available else tkfont.nametofont("TkDefaultFont").cget("family")
 
 
 def _configure_style(root):
@@ -218,15 +263,158 @@ def _configure_style(root):
     except tk.TclError:
         pass
 
+    family = _ui_family(root)
+    body = (family, TYPE_SCALE["body"])
+
     root.configure(background=INK["surface"])
     style.configure("TFrame", background=INK["surface"])
-    style.configure("TLabel", background=INK["surface"], foreground=INK["primary"])
-    style.configure("Secondary.TLabel", background=INK["surface"], foreground=INK["secondary"])
-    style.configure("Muted.TLabel", background=INK["surface"], foreground=INK["muted"])
-    style.configure("TNotebook", background=INK["surface"], borderwidth=0)
-    style.configure("TNotebook.Tab", padding=(16, 8))
-    style.configure("TButton", padding=(12, 6))
+    style.configure("TLabel", background=INK["surface"], foreground=INK["primary"], font=body)
+    style.configure("Secondary.TLabel", background=INK["surface"], foreground=INK["secondary"], font=body)
+    style.configure("Muted.TLabel", background=INK["surface"], foreground=INK["muted"], font=body)
+    style.configure(
+        "Display.TLabel",
+        background=INK["surface"],
+        foreground=INK["primary"],
+        font=(family, TYPE_SCALE["display"]),
+    )
+    style.configure(
+        "Value.TLabel",
+        background=INK["surface"],
+        foreground=INK["primary"],
+        font=(family, TYPE_SCALE["value"]),
+    )
+    style.configure(
+        "Title.TLabel",
+        background=INK["surface"],
+        foreground=INK["primary"],
+        font=(family, TYPE_SCALE["title"], "bold"),
+    )
+
+    style.configure("TNotebook", background=INK["surface"], borderwidth=0, tabmargins=(0, 0, 0, 0))
+    style.configure(
+        "TNotebook.Tab",
+        padding=(20, 10),
+        background=INK["surface"],
+        foreground=INK["muted"],
+        borderwidth=0,
+        font=body,
+    )
+    style.map(
+        "TNotebook.Tab",
+        background=[("selected", INK["surface"])],
+        foreground=[("selected", INK["primary"])],
+        expand=[("selected", (0, 0, 0, 2))],
+    )
+
+    style.configure(
+        "TButton",
+        padding=(14, 7),
+        background=INK["surface"],
+        foreground=INK["primary"],
+        bordercolor=INK["gridline"],
+        focuscolor=INK["surface"],
+        borderwidth=1,
+        font=body,
+    )
+    style.map(
+        "TButton",
+        background=[("active", INK["gridline"])],
+        bordercolor=[("active", INK["secondary"])],
+    )
+    style.configure("TSeparator", background=INK["gridline"])
     return style
+
+
+def create_landmarks_figure(image, landmarks, roles):
+    """The 68 landmarks over the cropped image, with the ones that feed a
+    reported descriptor picked out from the ones that feed none."""
+    fig = Figure(figsize=(7.6, 7.6), dpi=100, facecolor=INK["surface"], layout="constrained")
+    ax = fig.subplots()
+    ax.imshow(image)
+
+    feeds = np.array([index in roles for index in range(len(landmarks))])
+    ax.scatter(landmarks[~feeds, 0], landmarks[~feeds, 1],
+               s=26, c=CONTEXT_COLOR, alpha=0.8, linewidths=0)
+    ax.scatter(landmarks[feeds, 0], landmarks[feeds, 1],
+               s=40, c=LANDMARK_ACCENT, linewidths=0)
+    highlight = ax.scatter([], [], s=190, facecolors="none",
+                           edgecolors=INK["primary"], linewidths=1.4)
+    ax.axis("off")
+    return fig, highlight
+
+
+def _build_landmarks_tab(parent, image, points, ldm68_idx):
+    content = ttk.Frame(parent, padding=24)
+    content.pack(fill="both", expand=True)
+
+    roles = landmark_descriptors()
+    landmarks = points[ldm68_idx]
+
+    heading = ttk.Label(content, text="Anthropometric points", style="Display.TLabel")
+    heading.pack(anchor="w", pady=(0, 4))
+
+    summary = ttk.Label(
+        content,
+        text=(
+            f"{len(roles)} of the {len(landmarks)} landmarks carry the reported descriptors. "
+            "The rest come with the 68-point convention and feed none of them."
+        ),
+        style="Secondary.TLabel",
+        wraplength=900,
+        justify="left",
+    )
+    summary.pack(anchor="w", pady=(0, 14))
+
+    figure, highlight = create_landmarks_figure(image, landmarks, roles)
+    _embed_figure(content, figure)
+
+    name_var = tk.StringVar(value="Point at a landmark to read it.")
+    feeds_var = tk.StringVar(value="")
+    ttk.Label(content, textvariable=name_var, style="Value.TLabel").pack(anchor="w", pady=(14, 0))
+    ttk.Label(content, textvariable=feeds_var, style="Secondary.TLabel",
+              wraplength=900, justify="left").pack(anchor="w", pady=(2, 0))
+
+    # Within this many image pixels a landmark counts as the one being pointed at.
+    reach = max(np.ptp(landmarks[:, 0]), np.ptp(landmarks[:, 1])) * 0.04
+
+    def _on_move(event):
+        # Only the landmarks that carry a descriptor answer to the pointer; the
+        # rest are drawn for context and stay inert.
+        nearest = None
+        if event.inaxes is not None and event.xdata is not None:
+            distances = np.hypot(landmarks[:, 0] - event.xdata, landmarks[:, 1] - event.ydata)
+            candidate = int(distances.argmin())
+            if distances[candidate] <= reach and candidate in roles:
+                nearest = candidate
+
+        if nearest is None:
+            name_var.set("Point at a landmark to read it.")
+            feeds_var.set("")
+            highlight.set_offsets(np.empty((0, 2)))
+        else:
+            name_var.set(f"{nearest} \u00b7 {LANDMARK_NAMES[nearest]}")
+            feeds_var.set("Feeds " + ", ".join(roles[nearest]))
+            highlight.set_offsets(landmarks[nearest:nearest + 1])
+        figure.canvas.draw_idle()
+
+    figure.canvas.mpl_connect("motion_notify_event", _on_move)
+    return content
+
+
+def _build_reported_grid(parent, measures, columns=3):
+    """The reported descriptors as a grid, so the values line up and read as
+    the result rather than as another line of text."""
+    grid = ttk.Frame(parent)
+    grid.pack(fill="x", anchor="w", pady=(0, 18))
+    for column in range(columns):
+        grid.columnconfigure(column, weight=1, uniform="reported")
+
+    for position, (name, value) in enumerate(measures.items()):
+        cell = ttk.Frame(grid, padding=(0, 7, 20, 7))
+        cell.grid(row=position // columns, column=position % columns, sticky="w")
+        ttk.Label(cell, text=name, style="Secondary.TLabel").pack(anchor="w")
+        ttk.Label(cell, text=value, style="Value.TLabel").pack(anchor="w", pady=(2, 0))
+    return grid
 
 
 def _build_part_row(parent, part, root):
@@ -238,21 +426,17 @@ def _build_part_row(parent, part, root):
     swatch.create_oval(2, 2, 14, 14, fill=part.color, outline="")
     swatch.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="n")
 
-    name_label = ttk.Label(row, text=part.display_name, font=("TkDefaultFont", 13, "bold"))
+    name_label = ttk.Label(row, text=part.display_name, style="Title.TLabel")
     name_label.grid(row=0, column=1, sticky="w")
 
     summary_text = "    ".join(f"{key}: {value}" for key, value in part.measurements.items())
     summary = ttk.Label(row, text=summary_text, style="Secondary.TLabel", wraplength=760, justify="left")
     summary.grid(row=1, column=1, sticky="w", pady=(2, 0))
 
+    # part.secondary holds the convex-hull measures of the segmentation mask.
+    # They were discarded during development for being unstable, so they stay
+    # in the CSV and out of this panel.
     next_row = 2
-    if part.secondary:
-        secondary_text = "Secondary (segmentation, diagnostic only): " + "    ".join(
-            f"{key}: {value}" for key, value in part.secondary.items()
-        )
-        secondary_label = ttk.Label(row, text=secondary_text, style="Muted.TLabel", wraplength=760, justify="left")
-        secondary_label.grid(row=next_row, column=1, sticky="w", pady=(2, 0))
-        next_row += 1
 
     status_var = tk.StringVar(value="")
     status_label = ttk.Label(row, textvariable=status_var, style="Muted.TLabel", wraplength=760, justify="left")
@@ -277,39 +461,49 @@ def launch_results_viewer(
     labels,
     results,
     points,
+    ldm68_idx=None,
     vertex_labels=None,
     label_names=None,
     parts=None,
-    facial_measures=None,
+    reported_measures=None,
     save_path="results/pipeline_panels.png",
 ):
     parts = parts or []
-    facial_measures = facial_measures or {}
+    reported_measures = reported_measures or {}
 
-    results_figure = create_results_figure(image, labels, results, points)
+    results_figure = create_results_figure(image, labels, results, points, ldm68_idx)
     output_path = _save_figure(results_figure, save_path)
 
     root = tk.Tk()
     root.title("AnthroFace3D Viewer")
-    root.geometry("1440x960")
+    # Fit the window to the screen instead of assuming a large display.
+    width = min(1440, root.winfo_screenwidth() - 80)
+    height = min(960, root.winfo_screenheight() - 80)
+    root.geometry(f"{width}x{height}")
+    root.minsize(1024, 680)
     _configure_style(root)
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill="both", expand=True)
 
     overview_tab = ttk.Frame(notebook)
+    landmarks_tab = ttk.Frame(notebook)
     mesh_tab = ttk.Frame(notebook)
     parts_tab = ttk.Frame(notebook)
-    notebook.add(overview_tab, text="2D Results")
-    notebook.add(mesh_tab, text="3D Viewer")
-    notebook.add(parts_tab, text="Measured Parts")
+    notebook.add(overview_tab, text="2D results")
+    notebook.add(landmarks_tab, text="Anthropometric points")
+    notebook.add(mesh_tab, text="3D viewer")
+    notebook.add(parts_tab, text="Measured parts")
 
     _embed_figure(overview_tab, results_figure, with_toolbar=True)
+
+    if ldm68_idx is not None:
+        _build_landmarks_tab(landmarks_tab, image, points, ldm68_idx)
 
     mesh_content = ttk.Frame(mesh_tab, padding=24)
     mesh_content.pack(fill="both", expand=True)
 
-    title = ttk.Label(mesh_content, text="Interactive 3D Viewer", font=("TkDefaultFont", 14, "bold"))
+    title = ttk.Label(mesh_content, text="Interactive 3D Viewer", style="Display.TLabel")
     title.pack(anchor="w", pady=(0, 12))
 
     description = ttk.Label(
@@ -356,29 +550,32 @@ def launch_results_viewer(
     parts_content = ttk.Frame(parts_tab, padding=24)
     parts_content.pack(fill="both", expand=True)
 
-    parts_title = ttk.Label(parts_content, text="Measured Parts", font=("TkDefaultFont", 14, "bold"))
-    parts_title.pack(anchor="w", pady=(0, 4))
+    parts_title = ttk.Label(parts_content, text="Reported descriptors", style="Display.TLabel")
+    parts_title.pack(anchor="w", pady=(0, 2))
 
-    if facial_measures:
-        facial_title = ttk.Label(
-            parts_content, text="Facial ratios & angles (dimensionless)", font=("TkDefaultFont", 12, "bold")
+    if reported_measures:
+        reported_caption = ttk.Label(
+            parts_content,
+            text="Dimensionless and taken from the landmarks alone.",
+            style="Secondary.TLabel",
         )
-        facial_title.pack(anchor="w", pady=(8, 2))
-        facial_text = "    ".join(f"{key}: {value}" for key, value in facial_measures.items())
-        facial_summary = ttk.Label(
-            parts_content, text=facial_text, style="Secondary.TLabel", wraplength=900, justify="left"
-        )
-        facial_summary.pack(anchor="w", pady=(0, 12))
+        reported_caption.pack(anchor="w", pady=(0, 12))
+        _build_reported_grid(parts_content, reported_measures)
 
     if parts:
+        ttk.Separator(parts_content, orient="horizontal").pack(fill="x", pady=(0, 16))
+
+        parts_subtitle = ttk.Label(parts_content, text="Per-part detail", style="Title.TLabel")
+        parts_subtitle.pack(anchor="w", pady=(0, 2))
+
         parts_description = ttk.Label(
             parts_content,
-            text="Each measured part opens in its own isolated 3D view: its points, convex hull, and reference landmarks.",
+            text="The landmark distances behind the descriptors above. Each part opens in its own 3D view.",
             style="Secondary.TLabel",
             wraplength=900,
             justify="left",
         )
-        parts_description.pack(anchor="w", pady=(0, 12))
+        parts_description.pack(anchor="w", pady=(0, 6))
         for part in parts:
             _build_part_row(parts_content, part, root)
     else:

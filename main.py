@@ -188,17 +188,21 @@ def run_pipeline(models, image_path):
     asymmetry = facial_asymmetry(v3d, canonical_shape, ldm68_idx)
     print(f"[+] Facial index: {facial_idx['facial_index']:.1f}")
 
-    # Facial-level measures (dimensionless ratios and angles): they have no
-    # per-part mask, so they are reported as a summary rather than a 3D view.
-    facial_measures = {
+    # The nine dimensionless descriptors the system reports. They lead the
+    # viewer because they are its output; the per-part numbers underneath are
+    # the landmark distances they are built from. The asymmetry indices and the
+    # convex-hull measures stay in the CSV, out of the viewer: both were
+    # discarded during development for being unstable.
+    reported_measures = {
+        "Nasal index": f"{nasal_measurements['nasal_index']:.2f} ({nasal_measurements['category']})",
         "Facial index": f"{facial_idx['facial_index']:.2f}",
-        "Canthal index": f"{eye_bilateral['canthal_index']:.2f}",
-        "Nasal tip angle": f"{angles['nasal_tip_angle']:.1f}°",
-        "Naso-intercanthal ratio": f"{width_ratios['naso_intercanthal_ratio']:.2f}",
-        "Fissure/biocular ratio": f"{width_ratios['fissure_biocular_ratio']:.2f}",
+        "Mouth/nose ratio": f"{mouth_meas['mouth_nose_ratio']:.2f}",
         "Mouth/biocular ratio": f"{width_ratios['mouth_biocular_ratio']:.2f}",
-        "Fissure asymmetry": f"{asymmetry['fissure_asymmetry']:.3f}",
-        "Eyebrow length asymmetry": f"{asymmetry['eyebrow_length_asymmetry']:.3f}",
+        "Naso-intercanthal ratio": f"{width_ratios['naso_intercanthal_ratio']:.2f}",
+        "Canthal index": f"{eye_bilateral['canthal_index']:.2f}",
+        "Fissure/biocular ratio": f"{width_ratios['fissure_biocular_ratio']:.2f}",
+        "Nasal tip angle": f"{angles['nasal_tip_angle']:.1f}°",
+        "Eyebrow tilt": f"{brow_meas['left']['eyebrow_tilt']:.1f}° / {brow_meas['right']['eyebrow_tilt']:.1f}° (L/R)",
     }
 
     # Measured parts, for the viewer's per-part isolated 3D views
@@ -312,10 +316,11 @@ def run_pipeline(models, image_path):
         "labels": labels,
         "results": results,
         "points": points,
+        "ldm68_idx": ldm68_idx,
         "vertex_labels": v_labels_clean,
         "label_names": label_names,
         "parts": parts,
-        "facial_measures": facial_measures,
+        "reported_measures": reported_measures,
     }
 
 
@@ -383,10 +388,11 @@ def main():
             labels=last["labels"],
             results=last["results"],
             points=last["points"],
+            ldm68_idx=last["ldm68_idx"],
             vertex_labels=last["vertex_labels"],
             label_names=last["label_names"],
             parts=last["parts"],
-            facial_measures=last["facial_measures"],
+            reported_measures=last["reported_measures"],
         )
         print(f"[+] Results panel saved to: {panel_path}")
 

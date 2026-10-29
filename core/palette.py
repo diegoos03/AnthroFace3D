@@ -34,12 +34,14 @@ LANDMARK_ACCENT = "#d03b3b"
 
 # Generic accent for previews not tied to one part (full point cloud, all 68
 # landmarks); kept out of PART_COLORS so it isn't read as a part's own color.
-GENERIC_ACCENT = "#256abf"
+GENERIC_ACCENT = "#3c7a89"
 
+# Neutrals built around the navy used by the figures of the written report, so
+# the viewer and the document read as one piece of work.
 INK = {
-    "primary": "#0b0b0b",
-    "secondary": "#52514e",
-    "muted": "#898781",
-    "gridline": "#e1e0d9",
+    "primary": "#1f3a5f",
+    "secondary": "#4a5c73",
+    "muted": "#8a94a2",
+    "gridline": "#dfe3e8",
     "surface": "#fcfcfb",
 }
