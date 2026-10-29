@@ -34,6 +34,60 @@ GNATHION = 8
 ZYGION_RIGHT = 2   # subject's right cheek contour (x<0)
 ZYGION_LEFT = 14   # subject's left cheek contour (x>0)
 
+# Landmark names, and which of the reported descriptors each one feeds. Both
+# are built from the constants above, so re-indexing a landmark carries through
+# instead of leaving the viewer saying something the measurements no longer do.
+LANDMARK_NAMES = {
+    NASION: "Nasion",
+    PRONASALE: "Pronasale",
+    SUBNASALE: "Subnasale",
+    ALA_RIGHT: "Ala (right)",
+    ALA_LEFT: "Ala (left)",
+    CHEILION_RIGHT: "Cheilion (right)",
+    CHEILION_LEFT: "Cheilion (left)",
+    LABIALE_SUPERIUS: "Labiale superius",
+    LABIALE_INFERIUS: "Labiale inferius",
+    GNATHION: "Gnathion",
+    ZYGION_RIGHT: "Cheek contour (right)",
+    ZYGION_LEFT: "Cheek contour (left)",
+    EYE_CORNERS["right"]["inner"]: "Endocanthion (right)",
+    EYE_CORNERS["right"]["outer"]: "Exocanthion (right)",
+    EYE_CORNERS["left"]["inner"]: "Endocanthion (left)",
+    EYE_CORNERS["left"]["outer"]: "Exocanthion (left)",
+    BROW_ENDS["right"]["medial"]: "Eyebrow medial end (right)",
+    BROW_ENDS["right"]["lateral"]: "Eyebrow lateral end (right)",
+    BROW_ENDS["left"]["medial"]: "Eyebrow medial end (left)",
+    BROW_ENDS["left"]["lateral"]: "Eyebrow lateral end (left)",
+}
+
+_INNER_CANTHI = (EYE_CORNERS["right"]["inner"], EYE_CORNERS["left"]["inner"])
+_OUTER_CANTHI = (EYE_CORNERS["right"]["outer"], EYE_CORNERS["left"]["outer"])
+
+DESCRIPTOR_LANDMARKS = {
+    "Nasal index": (NASION, SUBNASALE, ALA_RIGHT, ALA_LEFT),
+    "Facial index": (NASION, GNATHION, ZYGION_RIGHT, ZYGION_LEFT),
+    "Mouth/nose ratio": (CHEILION_RIGHT, CHEILION_LEFT, ALA_RIGHT, ALA_LEFT),
+    "Mouth/biocular ratio": (CHEILION_RIGHT, CHEILION_LEFT) + _OUTER_CANTHI,
+    "Naso-intercanthal ratio": (ALA_RIGHT, ALA_LEFT) + _INNER_CANTHI,
+    "Canthal index": _INNER_CANTHI + _OUTER_CANTHI,
+    "Fissure/biocular ratio": _INNER_CANTHI + _OUTER_CANTHI,
+    "Nasal tip angle": (NASION, PRONASALE, SUBNASALE),
+    "Eyebrow tilt": (
+        BROW_ENDS["right"]["medial"], BROW_ENDS["right"]["lateral"],
+        BROW_ENDS["left"]["medial"], BROW_ENDS["left"]["lateral"],
+    ) + _OUTER_CANTHI,
+}
+
+
+def landmark_descriptors():
+    """Reported descriptors each landmark index feeds. Most of the 68 feed none
+    and are absent from the result."""
+    roles = {}
+    for descriptor, indices in DESCRIPTOR_LANDMARKS.items():
+        for index in indices:
+            roles.setdefault(index, []).append(descriptor)
+    return roles
+
 
 def _hull_area_volume(points):
     # A convex hull needs >=4 points; empty or near-planar masks return NaN
