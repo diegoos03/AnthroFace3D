@@ -36,17 +36,77 @@ signals (unit-less and less reliable).
 
 ## Installation
 
-Requires Python 3.13, CPU-only.
+Requires Python 3.13 and runs on CPU. Two of the four steps below are easy to
+miss. The mesh renderer has to be built on your own machine, and the model
+weights have to be downloaded separately, around 450 MB of them. Neither one is
+kept in the repository.
+
+### 1. System packages
+
+`dlib` and the mesh renderer are C++ extensions that get compiled while you
+install them, so you need a compiler and CMake first. The interactive viewer
+needs Tk.
+
+```bash
+# Ubuntu / Debian
+sudo apt install python3.13-venv python3.13-tk build-essential cmake
+```
+
+On macOS, `xcode-select --install` and `brew install cmake python-tk@3.13`. On
+Windows, install CMake and the Visual Studio Build Tools with the C++ workload;
+Tk comes with the python.org installer.
+
+### 2. Virtual environment
 
 ```bash
 python3.13 -m venv venv
-source venv/bin/activate
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-The interactive viewer needs Tk (`python3.13-tk` on Ubuntu). Model weights
-(3DMM, RetinaFace, ResNet-50, dlib landmarks) live under `assets/` and are not
-versioned.
+### 3. Compile the CPU mesh renderer
+
+The renderer is a Cython extension that is not kept in the repository, so it has
+to be built once. Do not skip this step. The default settings render on CPU and
+fail without it.
+
+```bash
+cd external/util/cython_renderer
+python setup.py build_ext -i
+cd ../../..
+```
+
+### 4. Download the model weights
+
+```bash
+python scripts/download_assets.py
+```
+
+The script downloads seven files into `assets/` from the original releases,
+checks the size of each one and skips anything already there. If you would
+rather fetch them by hand:
+
+| File | Source | Used for |
+| --- | --- | --- |
+| `face_model.npy` | [3DDFA-V3 assets][a] | 3DMM shape, expression and texture bases |
+| `net_recon.pth` | [3DDFA-V3 assets][a] | ResNet-50 coefficient regressor |
+| `large_base_net.pth` | [3DDFA-V3 assets][a] | internal landmark model |
+| `retinaface_resnet50_2020-07-20_old_torch.pth` | [3DDFA-V3 assets][a] | face detection |
+| `similarity_Lm3D_all.mat` | [3DDFA-V3 assets][a] | reference landmarks for the internal crop |
+| `net_recon_mbnet.pth` | [3DDFA-V3 assets][a] | only for the MobileNet-V3 backbone |
+| `shape_predictor_68_face_landmarks.dat` | [dlib][b] | 68 landmarks for the FFHQ crop |
+
+[a]: https://huggingface.co/datasets/Zidu-Wang/3DDFA-V3/tree/main/assets
+[b]: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+
+SegFormer is the one model you do not have to fetch yourself. It comes down from
+the Hugging Face Hub the first time you run the pipeline and stays cached
+afterwards, so that first run needs an internet connection.
+
+Each of these files is published by its own authors under its own terms.
+`face_model.npy` comes from the Basel Face Model, licensed by the University of
+Basel, and the dlib predictor is trained on iBUG 300-W, which rules out
+commercial use.
 
 ## Usage
 
@@ -56,12 +116,16 @@ python main.py path/to/image.jpg --no-viewer    # single image, no viewer
 python main.py path/to/folder/ --csv out.csv    # batch a folder, export every measure to CSV
 ```
 
+Run these from the repository root. Part of the vendored 3DDFA-V3 code resolves
+`assets/` relative to the working directory, so launching from anywhere else
+fails to find the weights.
+
 ## Structure
 
 - `main.py` — end-to-end pipeline with a small CLI.
 - `core/` — detection, reconstruction, segmentation, 2D→3D fusion, symmetry,
   measurements and visualization.
-- `external/` — vendored 3DDFA-V3.
+- `external/` — vendored 3DDFA-V3 (MIT, see `external/LICENSE`).
 - `validation/` — reproducible validation experiments (landmark–segmentation
   coherence, synthetic round-trip, pose robustness, demographic analysis).
 
