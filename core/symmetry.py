@@ -8,7 +8,7 @@ def apply_symmetry(points, labels, results, symmetric_translate):
     print("[*] Applying occlusion symmetry correction...")
 
     # Per-vertex visibility (matches points/labels ordering)
-    visible = results.get('visible_idx', None)
+    visible = results.get("visible_idx", None)
 
     if visible is None or visible.shape[0] != points.shape[0]:
         visible = np.ones(points.shape[0], dtype=bool)
@@ -50,7 +50,7 @@ def apply_nose_lip_symmetry(points, labels, angle, label2id, symmetric_translate
     x_coords = points[:, 0]
     yaw_sign = np.sign(angle.flatten()[1])
 
-    symmetrical_ids = [label2id[e] for e in ('nose', 'u_lip', 'l_lip')]
+    symmetrical_ids = [label2id[e] for e in ("nose", "u_lip", "l_lip")]
 
     # Side turned away from the camera: distrust it, copy the mirrored label instead
     _, mirror_idx = tree.query(points * [-1, 1, 1], k=1)

@@ -1,4 +1,3 @@
-import torch
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
 
 from external.face_box import face_box

@@ -65,8 +65,8 @@ def clean_labels_with_connectivity(points, labels, label2id, k=8):
     size_threshold = 200
 
     allowed_labels = [
-        'background', 'skin', 'hat',
-        'neck_l', 'neck', 'cloth'
+        "background", "skin", "hat",
+        "neck_l", "neck", "cloth"
     ]
 
     allowed_ids = [label2id[x] for x in allowed_labels if x in label2id]
@@ -89,7 +89,7 @@ def clean_labels_with_connectivity(points, labels, label2id, k=8):
         unique_components, counts = np.unique(component_labels, return_counts=True)
 
         # treat hair differently due to its potential fragmentation
-        if label != label2id.get('hair', -1):
+        if label != label2id.get("hair", -1):
             size_threshold_label = counts.max()
         else:
             size_threshold_label = size_threshold

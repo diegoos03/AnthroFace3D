@@ -111,7 +111,7 @@ def run_pipeline(models, image_path):
 
     # Canonical (unposed) 3D shape: the correct space for mirror-based
     # symmetry and neighbor-based cleanup, independent of head rotation
-    canonical_shape = results['face_shape'][0]
+    canonical_shape = results["face_shape"][0]
 
     # Fold the eyeglasses mask into the eyes so glasses don't blank the eye
     # region (runs on the canonical shape, before symmetry/cleanup)
@@ -129,7 +129,7 @@ def run_pipeline(models, image_path):
     v_labels_sym = apply_nose_lip_symmetry(
         points=canonical_shape,
         labels=v_labels_sym,
-        angle=results['angle'],
+        angle=results["angle"],
         label2id=label2id,
         symmetric_translate=symmetric_translate
     )
@@ -142,7 +142,7 @@ def run_pipeline(models, image_path):
     )
 
     # Anthropometric measurements
-    v3d = results['v3d'][0]
+    v3d = results["v3d"][0]
 
     nasal_measurements = nasal_index(v3d, ldm68_idx)
     print(f"[+] Nasal Index: {nasal_measurements['nasal_index']:.2f} ({nasal_measurements['category']})")

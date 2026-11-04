@@ -6,7 +6,6 @@ _mpl_cache_dir = Path.cwd() / ".mplconfig"
 _mpl_cache_dir.mkdir(exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(_mpl_cache_dir))
 
-import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
@@ -19,7 +18,7 @@ MEASURES = [
     "mouth_biocular_ratio", "nasal_tip_angle", "eyebrow_tilt", "facial_index",
     "naso_intercanthal_ratio",
 ]
-LABELS = {  
+LABELS = {
     "nasal_index": "Índice nasal", "canthal_index": "Índice cantal",
     "fissure_biocular_ratio": "Razón hendidura/biocular", "mouth_nose_ratio": "Razón boca/nariz",
     "mouth_biocular_ratio": "Razón boca/biocular", "nasal_tip_angle": "Ángulo punta nasal",

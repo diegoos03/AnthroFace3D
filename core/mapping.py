@@ -9,7 +9,7 @@ def map_segmentation_to_mesh(labels, face_proj_original):
     # Grid coordinates
     x = np.arange(labels.shape[0])
     y = np.arange(labels.shape[1])
-    xx, yy = np.meshgrid(x, y, indexing='ij')
+    xx, yy = np.meshgrid(x, y, indexing="ij")
 
     points = np.column_stack((xx.ravel(), yy.ravel()))
     values = labels.ravel()

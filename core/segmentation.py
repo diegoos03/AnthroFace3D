@@ -21,7 +21,7 @@ def run_segmentation(image, processor, model, device):
     print("[*] Running segmentation...")
 
     inputs = processor(images=image, return_tensors="pt").to(device)
-    
+
     with torch.no_grad():
         outputs = model(**inputs)
 

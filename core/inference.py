@@ -20,7 +20,7 @@ def run_3ddfa(image, face_detector, recon_model, device):
 
 
 def project_to_original_image(results, recon_model, trans_params):
-    v3d = results['v3d']
+    v3d = results["v3d"]
 
     persc_proj = recon_model.persc_proj.cpu().numpy()
 

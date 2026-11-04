@@ -13,5 +13,5 @@ def load_and_crop_image(image_path, config):
     image = ffhqcrop.from_image_path(image_path)
 
     print("[+] Image successfully preprocessed")
-    
+
     return image
