@@ -39,16 +39,18 @@ def _style():
     })
 
 
-def signal_ratio(df):
-    """Range of race means over the global individual std, per descriptor."""
+def eta_squared(df):
+    """Share of each descriptor's variance explained by the demographic group."""
     out = {}
     for m in MEASURES:
-        rng = df.groupby("race")[m].mean().max() - df.groupby("race")[m].mean().min()
-        out[m] = rng / df[m].std()
+        grand = df[m].mean()
+        groups = df.groupby("race")[m]
+        between = (groups.size() * (groups.mean() - grand) ** 2).sum()
+        out[m] = between / ((df[m] - grand) ** 2).sum()
     return pd.Series(out).sort_values(ascending=False)
 
 
-def fig_nasal_by_race(df, figdir):
+def fig_nasal_by_ethnicity(df, figdir):
     _style()
     order = df.groupby("race")["nasal_index"].median().sort_values().index
     data = [df.loc[df.race == r, "nasal_index"].values for r in order]
@@ -64,7 +66,7 @@ def fig_nasal_by_race(df, figdir):
     ax.set_ylabel("Índice nasal")
     ax.grid(axis="y", ls=":", color=GRID, lw=0.8); ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
-    fig.tight_layout(); fig.savefig(os.path.join(figdir, "fig_demo_nasal_raza.pdf"), bbox_inches="tight")
+    fig.tight_layout(); fig.savefig(os.path.join(figdir, "fig_demo_nasal_etnia.pdf"), bbox_inches="tight")
     plt.close(fig)
 
 
@@ -91,16 +93,16 @@ def fig_age_trends(df, figdir):
     plt.close(fig)
 
 
-def fig_signal(ratio, figdir):
+def fig_signal(eta, figdir):
     _style()
-    r = ratio.sort_values()
+    r = eta.sort_values()
     labels = [LABELS[m] for m in r.index]
-    cols = [NAVY if v >= 1 else "#9AA0A6" for v in r.values]
+    cols = [NAVY if v >= 0.10 else "#9AA0A6" for v in r.values]
     fig, ax = plt.subplots(figsize=(6.3, 4.1))
     ax.barh(range(len(r)), r.values, color=cols, edgecolor="none")
-    ax.axvline(1.0, color=VINO, lw=1.3, ls="--")
+    ax.axvline(0.10, color=VINO, lw=1.3, ls="--")
     ax.set_yticks(range(len(r))); ax.set_yticklabels(labels)
-    ax.set_xlabel("Rango entre razas / desviación individual")
+    ax.set_xlabel("$\\eta^2$ (fracción de la varianza explicada por el grupo)")
     ax.grid(axis="x", ls=":", color=GRID, lw=0.8); ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
     fig.tight_layout(); fig.savefig(os.path.join(figdir, "fig_demo_senal.pdf"), bbox_inches="tight")
@@ -117,17 +119,17 @@ def main():
     df = pd.read_csv(args.csv)
     print(f"n = {len(df)}\n")
     with pd.option_context("display.width", 200, "display.max_columns", 20):
-        print("=== mean by race ===\n", df.groupby("race")[MEASURES].mean().round(2), "\n")
+        print("=== mean by ethnic group ===\n", df.groupby("race")[MEASURES].mean().round(2), "\n")
         print("=== mean by sex ===\n", df.groupby("gender")[MEASURES].mean().round(2), "\n")
         print("=== mean by age ===\n", df.groupby("age")[MEASURES].mean().reindex(AGE_ORDER).round(2), "\n")
-    ratio = signal_ratio(df)
-    print("=== between-group / within-individual ratio ===\n", ratio.round(2))
+    eta = eta_squared(df)
+    print("=== variance explained by the ethnic group (eta squared) ===\n", eta.round(3))
 
     if not args.no_figs:
         os.makedirs(args.figdir, exist_ok=True)
-        fig_nasal_by_race(df, args.figdir)
+        fig_nasal_by_ethnicity(df, args.figdir)
         fig_age_trends(df, args.figdir)
-        fig_signal(ratio, args.figdir)
+        fig_signal(eta, args.figdir)
         print(f"\nfigures written to {args.figdir}")
 
 
